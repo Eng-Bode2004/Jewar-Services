@@ -1,7 +1,7 @@
-import UserControllers from "../Controllers/UserControllers.ts";
+import UserControllers from "../Controllers/UserControllers.js";
 
 // import Middleware
-import RegisterUser from "../Middlewares/RegisterUser.ts"
+import RegisterUser from "../Middlewares/RegisterUser.js"
 
 
 

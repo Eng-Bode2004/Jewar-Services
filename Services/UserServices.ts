@@ -1,4 +1,4 @@
-import UserSchema from '../Models/UserSchema.ts';
+import UserSchema from '../Models/UserSchema.js';
 import bcrypt from "bcryptjs";
 
 class UserServices {

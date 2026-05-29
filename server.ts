@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import "./Config/DataBase.js";
-import UserRoutes from "./Routes/UserRoutes.ts";
+import UserRoutes from "./Routes/UserRoutes.js";
 
 // Initialize Express
 const app = express();
