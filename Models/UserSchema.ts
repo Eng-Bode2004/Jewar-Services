@@ -29,31 +29,22 @@ const UserSchema = new mongoose.Schema(
             trim:   true,
         },
 
-        isPhoneVerified: {
-            type:    Boolean,
-            default: false,
-        },
 
         // ── Email ───────────────────────────────────────────────────────────────
         email: {
             type:   String,
             unique: true,
-            sparse: true,   // [BUG-3] sparse prevents unique-index crash on null
+            sparse: true,
             trim:   true,
             lowercase: true,
         },
 
-        isEmailVerified: {
-            type:    Boolean,
-            default: false,
-        },
 
         // ── Password ─────────────────────────────────────────────────────────────
-        // [BUG-4] renamed Password → password (camelCase convention)
         password: {
             type:     String,
             required: true,
-            select:   false,  // never returned in queries by default
+            select:   false,
         },
 
         // ── Status ───────────────────────────────────────────────────────────────
@@ -83,15 +74,23 @@ const UserSchema = new mongoose.Schema(
         // ── Preferences ──────────────────────────────────────────────────────────
         language: {
             type:    String,
-            default: "arabic",          // [BUG-1] was: default: arabic (no quotes)
-            enum:    SUPPORTED_LANGUAGES, // [BUG-2] was: enum:"arabic","french",...
+            default: "arabic",
+            enum:    SUPPORTED_LANGUAGES,
             lowercase: true,
         },
+
+        // ── Verification ──────────────────────────────────────────────────────────
+
+        isUserVerified: {
+            type:    Boolean,
+            default: false,
+        },
+
     },
 
     // ── Schema Options ─────────────────────────────────────────────────────────
     {
-        timestamps: true, // [BUG-5] adds createdAt + updatedAt automatically
+        timestamps: true,
         versionKey: false,
     }
 );

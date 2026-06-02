@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import "./Config/DataBase.js";
-import UserRoutes from "./Routes/UserRoutes.js";
+import UserRoutes from "./Routes/UserRoutes.ts";
 
 // Initialize Express
 const app = express();
@@ -10,7 +10,7 @@ const app = express();
 app.use(express.json());
 
 // Routes
-app.use("/api/v1/en/users", UserRoutes);
+app.use("/api/v1/users", UserRoutes);
 
 // Start Server
 const PORT = process.env.PORT || 5000;
