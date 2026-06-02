@@ -1,0 +1,17 @@
+import "dotenv/config";
+import express from "express";
+import "./Config/DataBase.ts";
+import RoleRoutes, { langRouter } from "./Routes/RoleRoutes.ts";
+
+const app = express();
+
+app.use(express.json());
+
+app.use("/api/v1/roles", RoleRoutes);
+
+
+const PORT = process.env.PORT || 5001;
+
+app.listen(PORT, () => {
+    console.log(`🚀 Role Services is running on port ${PORT}`);
+});
