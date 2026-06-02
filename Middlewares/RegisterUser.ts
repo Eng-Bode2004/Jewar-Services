@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 
 export function validateRegistration(req: Request, res: Response, next: NextFunction) {
-    const { username, password, email, phone_number } = req.body;
+    const { username, password, confirmPassword, email, phone_number } = req.body;
     const errors: string[] = [];
 
     if (!username || typeof username !== "string") {
@@ -16,6 +16,12 @@ export function validateRegistration(req: Request, res: Response, next: NextFunc
         errors.push("Password is required");
     } else if (password.length < 6) {
         errors.push("Password must be at least 6 characters");
+    }
+
+    if (!confirmPassword || typeof confirmPassword !== "string") {
+        errors.push("Confirm password is required");
+    } else if (password !== confirmPassword) {
+        errors.push("Passwords do not match");
     }
 
     if (!email && !phone_number) {
@@ -44,6 +50,8 @@ export function validateRegistration(req: Request, res: Response, next: NextFunc
         });
         return;
     }
+
+    delete req.body.confirmPassword;
 
     next();
 }
