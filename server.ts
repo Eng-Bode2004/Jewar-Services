@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import "./Config/DataBase.ts";
-import RoleRoutes, { langRouter } from "./Routes/RoleRoutes.ts";
+import RoleRoutes from "./Routes/RoleRoutes.ts";
 
 const app = express();
 
