@@ -86,7 +86,10 @@ class RoleServices {
             const nameField = `${prefix}_name` as const;
             const descField = `${prefix}_Description` as const;
 
+            const ADMIN_ROLE_ID = "6a3354b39662f99f4a86fb11";
+
             const roles = await RoleModel.find({
+                _id: { $ne: ADMIN_ROLE_ID },
                 [nameField]: { $exists: true, $ne: "" },
             }).select(`${nameField} ${descField} imageUrl`);
 
