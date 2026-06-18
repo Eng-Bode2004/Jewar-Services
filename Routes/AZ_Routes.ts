@@ -28,9 +28,6 @@ router.delete('/:id', AZ_Controllers.deleteZone);
 // Toggle zone active/inactive
 router.patch('/:id/toggle', AZ_Controllers.toggleZoneStatus);
 
-// Get zone statistics
-router.get("/stats/overview", AZ_Controllers.getZoneStats);
-
 router.post("/check-location", AZ_Controllers.checkLocation);
 
 
