@@ -12,7 +12,7 @@ class AZ_Services {
     // =========================================================
     async createZone(zoneData) {
         try {
-            const { name, governorate, city, polygon, delivery_fee_base, delivery_fee_per_km } = zoneData;
+            const { name, governorate, city, polygon, delivery_avg_fee_base, delivery_highest_fee_base, delivery_lowest_fee_base, delivery_fee_per_km } = zoneData;
 
             const existZone = await AZ_Schema.findOne({ name });
             if (existZone) {
@@ -34,7 +34,9 @@ class AZ_Services {
                 governorate,
                 city,
                 polygon,
-                delivery_fee_base,
+                delivery_avg_fee_base,
+                delivery_highest_fee_base,
+                delivery_lowest_fee_base,
                 delivery_fee_per_km,
             });
 
