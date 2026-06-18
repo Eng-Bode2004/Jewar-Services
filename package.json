@@ -3,6 +3,9 @@
   "module": "server.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "start": "bun run server.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/cors": "^2.8.19",
