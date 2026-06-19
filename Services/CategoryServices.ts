@@ -1,4 +1,5 @@
 import Category from "../Models/CategorySchema.ts";
+import SubCategory from "../Models/SubCategorySchema.ts";
 
 class CategoryServices {
     async createCategory(data: { name: string; image?: string; description?: string }): Promise<any> {
@@ -38,6 +39,12 @@ class CategoryServices {
         const category = await Category.findByIdAndDelete(id);
         if (!category) throw new Error("Category not found");
         return category;
+    }
+
+    async getSubCategoriesByCategory(categoryId: string): Promise<any> {
+        const category = await Category.findById(categoryId);
+        if (!category) throw new Error("Category not found");
+        return await SubCategory.find({ categoryId }).sort({ createdAt: -1 });
     }
 }
 

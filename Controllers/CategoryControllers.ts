@@ -68,6 +68,20 @@ class CategoryControllers {
             });
         }
     }
+
+    async getSubCategories(req: Request, res: Response): Promise<Response> {
+        try {
+            const id = req.params.id as string;
+            const subcategories = await CategoryServices.getSubCategoriesByCategory(id);
+            return res.status(200).json({ status: "success", response: subcategories });
+        } catch (error) {
+            const status = error instanceof Error && error.message === "Category not found" ? 404 : 500;
+            return res.status(status).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Fetch failed",
+            });
+        }
+    }
 }
 
 export default new CategoryControllers();
