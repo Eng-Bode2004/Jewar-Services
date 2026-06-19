@@ -14,8 +14,10 @@ if (!mongoURI) {
 
 mongoose
     .connect(mongoURI)
-    .then(() => {
+    .then(async () => {
         console.log("✅ MongoDB Connected Successfully");
+        await mongoose.syncIndexes();
+        console.log("✅ Indexes synced");
     })
     .catch((error) => {
         console.error("❌ MongoDB Connection Failed:", error.message);
