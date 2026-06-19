@@ -31,15 +31,18 @@ class OTPServices {
             };
         }
 
-        // Send email in background — don't block the response
-        this._sendEmail(smtpUser, smtpPass, email, otp_code).catch((err) => {
-            console.error(`Failed to send email OTP to ${email}:`, err);
-        });
-
-        return {
-            message: `OTP sent to ${email}`,
-            expiresInMinutes: 10,
-        };
+        try {
+            await this._sendEmail(smtpUser, smtpPass, email, otp_code);
+            console.log(`✅ Email OTP sent to ${email}`);
+            return {
+                message: `OTP sent to ${email}`,
+                expiresInMinutes: 10,
+            };
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : "Unknown error";
+            console.error(`❌ Failed to send email OTP to ${email}:`, errorMsg);
+            throw new Error(`Failed to send email: ${errorMsg}`);
+        }
     }
 
     private async _sendEmail(smtpUser: string, smtpPass: string, to: string, otp_code: string) {
@@ -48,7 +51,9 @@ class OTPServices {
             port: parseInt(process.env.SMTP_PORT ?? "587"),
             secure: false,
             auth: { user: smtpUser, pass: smtpPass },
-            connectionTimeout: 5000,
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 10000,
         });
 
         await transporter.sendMail({
