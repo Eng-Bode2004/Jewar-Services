@@ -48,8 +48,8 @@ class OTPServices {
     private async _sendEmail(smtpUser: string, smtpPass: string, to: string, otp_code: string) {
         const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST ?? "smtp.gmail.com",
-            port: parseInt(process.env.SMTP_PORT ?? "587"),
-            secure: false,
+            port: parseInt(process.env.SMTP_PORT ?? "465"),
+            secure: true,
             auth: { user: smtpUser, pass: smtpPass },
             connectionTimeout: 10000,
             greetingTimeout: 10000,
