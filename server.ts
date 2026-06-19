@@ -1,10 +1,12 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
 import "./Config/DataBase.js";
 import OTPRoutes from "./Routes/OTPRoutes.ts";
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 
 app.use("/api/v1/otp", OTPRoutes);
