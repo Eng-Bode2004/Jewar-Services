@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
 import "./Config/DataBase.js";
 import UserRoutes from "./Routes/UserRoutes.ts";
 
@@ -7,6 +8,7 @@ import UserRoutes from "./Routes/UserRoutes.ts";
 const app = express();
 
 // Middleware
+app.use(cors());
 app.use(express.json());
 
 // Routes
