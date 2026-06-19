@@ -31,4 +31,13 @@ router.post(
     ImagesControllers.uploadPhoto
 );
 
+router.post(
+    "/subcategory-image",
+    (req, _res, next) => { req.uploadFolder = "Savora/Admin/Categories/Sub Category"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.delete("/:id", ImagesControllers.deletePhoto);
+
 export default router;

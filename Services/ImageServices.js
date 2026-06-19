@@ -27,6 +27,28 @@ class ImageServices {
 
         return await newImage.save();
     }
+
+    async deletePhoto(imageId) {
+        const image = await ImagesSchema.findById(imageId);
+        if (!image) throw new Error("Image not found");
+
+        const url = image.URL;
+        const publicId = this.extractPublicId(url);
+        if (publicId) {
+            await cloudinary.uploader.destroy(publicId);
+        }
+
+        await ImagesSchema.findByIdAndDelete(imageId);
+        return { deleted: true, publicId };
+    }
+
+    extractPublicId(url) {
+        const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)\.(?:jpg|jpeg|png|gif|webp|svg|bmp|tiff?)$/i);
+        if (match) return match[1];
+        const altMatch = url.match(/\/upload\/(?:v\d+\/)?(.+?)$/);
+        if (altMatch && !altMatch[1].includes("/")) return altMatch[1];
+        return null;
+    }
 }
 
 export default new ImageServices();

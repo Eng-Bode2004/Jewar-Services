@@ -31,6 +31,27 @@ class ImagesControllers {
             });
         }
     }
+
+    async deletePhoto(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ status: "error", message: "Image ID is required" });
+            }
+            const result = await ImageServices.deletePhoto(id);
+            return res.status(200).json({
+                status: "success",
+                message: "Image deleted successfully",
+                data: result,
+            });
+        } catch (error) {
+            const status = error.message === "Image not found" ? 404 : 500;
+            return res.status(status).json({
+                status: "error",
+                message: error.message || "Delete failed",
+            });
+        }
+    }
 }
 
 export default new ImagesControllers();
