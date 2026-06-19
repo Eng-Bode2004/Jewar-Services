@@ -9,6 +9,7 @@
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
     "@types/bun": "latest",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10"
   },
@@ -16,10 +17,11 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "bson": "7.0.0",
     "@anthropic-ai/sdk": "^0.100.1",
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^3.0.3",
+    "bson": "7.0.0",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
@@ -27,4 +29,3 @@
     "openai": "^6.39.1"
   }
 }
-
