@@ -1,8 +1,13 @@
 import Category from "../Models/CategorySchema.ts";
 
 class CategoryServices {
-    async createCategory(data: { name: string }): Promise<any> {
-        const category = await Category.create({ name: data.name });
+    async createCategory(data: { name: string; image?: string; description?: string }): Promise<any> {
+        if (!data.name || !data.name.trim()) throw new Error("Name is required");
+        const category = await Category.create({
+            name: data.name.trim(),
+            image: data.image || "",
+            description: data.description || "",
+        });
         return category;
     }
 
