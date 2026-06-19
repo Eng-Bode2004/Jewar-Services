@@ -1,5 +1,8 @@
+import mongoose from "mongoose";
 import Category from "../Models/CategorySchema.ts";
 import SubCategory from "../Models/SubCategorySchema.ts";
+
+const IMAGES_API = process.env.IMAGES_API_URL || "https://savora-imageservices-production.up.railway.app";
 
 class CategoryServices {
     async createCategory(data: { name: string; image?: string; description?: string }): Promise<any> {
@@ -36,15 +39,35 @@ class CategoryServices {
     }
 
     async deleteCategory(id: string): Promise<any> {
-        const category = await Category.findByIdAndDelete(id);
+        const category = await Category.findById(id);
         if (!category) throw new Error("Category not found");
+
+        if (category.image) {
+            await this.deleteImageFromServices(category.image);
+        }
+
+        await Category.findByIdAndDelete(id);
         return category;
     }
+
 
     async getSubCategoriesByCategory(categoryId: string): Promise<any> {
         const category = await Category.findById(categoryId);
         if (!category) throw new Error("Category not found");
         return await SubCategory.find({ categoryId }).sort({ createdAt: -1 });
+    }
+
+    async deleteImageFromServices(imageUrl: string): Promise<void> {
+        try {
+            const db = mongoose.connection.db;
+            if (!db) return;
+            const image = await db.collection("images").findOne({ URL: imageUrl });
+            if (image && image._id) {
+                await fetch(`${IMAGES_API}/api/v2/images/${image._id}`, { method: "DELETE" });
+            }
+        } catch (err) {
+            console.error("Failed to delete category image:", err);
+        }
     }
 }
 
