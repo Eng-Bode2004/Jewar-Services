@@ -4,12 +4,14 @@ import SubCategory from "../Models/SubCategorySchema.ts";
 const IMAGES_API = process.env.IMAGES_API_URL || "https://savora-imageservices-production.up.railway.app";
 
 class SubCategoryServices {
-    async createSubCategory(data: { name: string; categoryId: string }): Promise<any> {
+    async createSubCategory(data: { name: string; categoryId: string; image?: string; description?: string }): Promise<any> {
         if (!data.name || !data.name.trim()) throw new Error("Name is required");
         if (!data.categoryId) throw new Error("categoryId is required");
         const sub = await SubCategory.create({
             name: data.name.trim(),
             categoryId: data.categoryId,
+            image: data.image || "",
+            description: data.description || "",
         });
         return sub;
     }
