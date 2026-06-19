@@ -23,7 +23,16 @@ class UserServices {
             password: hashedPassword,
         });
 
-        return user;
+        const JWT_SECRET = process.env.JWT_SECRET || "savora_jwt_secret_dev";
+        const token = jwt.sign(
+            { id: user._id, role: user.role },
+            JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+        const userObj = user.toObject();
+        const { password: _, ...safeUser } = userObj;
+
+        return { user: safeUser, token };
     }
 
     /////////////////////////////////////////// Register Using Email ///////////////////////////
@@ -47,7 +56,16 @@ class UserServices {
             password: hashedPassword,
         });
 
-        return user;
+        const JWT_SECRET = process.env.JWT_SECRET || "savora_jwt_secret_dev";
+        const token = jwt.sign(
+            { id: user._id, role: user.role },
+            JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+        const userObj = user.toObject();
+        const { password: _, ...safeUser } = userObj;
+
+        return { user: safeUser, token };
     }
 
     /////////////////////////////////////////// Verify User //////////////////////////////
