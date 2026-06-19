@@ -1,4 +1,7 @@
+import mongoose from "mongoose";
 import SubCategory from "../Models/SubCategorySchema.ts";
+
+const IMAGES_API = process.env.IMAGES_API_URL || "https://savora-imageservices-production.up.railway.app";
 
 class SubCategoryServices {
     async createSubCategory(data: { name: string; categoryId: string }): Promise<any> {
@@ -37,15 +40,35 @@ class SubCategoryServices {
     }
 
     async deleteSubCategory(id: string): Promise<any> {
-        const sub = await SubCategory.findByIdAndDelete(id);
+        const sub = await SubCategory.findById(id);
         if (!sub) throw new Error("SubCategory not found");
+
+        if (sub.image) {
+            await this.deleteImageFromServices(sub.image);
+        }
+
+        await SubCategory.findByIdAndDelete(id);
         return sub;
     }
+
 
     async getSubCategoriesByCategory(categoryId: string): Promise<any> {
         return await SubCategory.find({ categoryId })
             .populate("categoryId", "name")
             .sort({ createdAt: -1 });
+    }
+
+    async deleteImageFromServices(imageUrl: string): Promise<void> {
+        try {
+            const db = mongoose.connection.db;
+            if (!db) return;
+            const image = await db.collection("images").findOne({ URL: imageUrl });
+            if (image && image._id) {
+                await fetch(`${IMAGES_API}/api/v2/images/${image._id}`, { method: "DELETE" });
+            }
+        } catch (err) {
+            console.error("Failed to delete subcategory image:", err);
+        }
     }
 }
 
