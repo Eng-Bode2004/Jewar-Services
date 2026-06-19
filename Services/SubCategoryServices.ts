@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import SubCategory from "../Models/SubCategorySchema.ts";
+import "../Models/CategorySchema.ts";
 
 const IMAGES_API = process.env.IMAGES_API_URL || "https://savora-imageservices-production.up.railway.app";
 
