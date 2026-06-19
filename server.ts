@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
 import "./Config/DataBase.js";
 import ChiefProfileRoutes from "./Routes/ChiefProfileRoutes.ts";
 
@@ -7,6 +8,7 @@ import ChiefProfileRoutes from "./Routes/ChiefProfileRoutes.ts";
 const app = express();
 
 // Middleware
+app.use(cors());
 app.use(express.json());
 
 // Routes
