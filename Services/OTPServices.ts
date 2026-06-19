@@ -31,16 +31,29 @@ class OTPServices {
             };
         }
 
+        // Send email in background — don't block the response
+        this._sendEmail(smtpUser, smtpPass, email, otp_code).catch((err) => {
+            console.error(`Failed to send email OTP to ${email}:`, err);
+        });
+
+        return {
+            message: `OTP sent to ${email}`,
+            expiresInMinutes: 10,
+        };
+    }
+
+    private async _sendEmail(smtpUser: string, smtpPass: string, to: string, otp_code: string) {
         const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST ?? "smtp.gmail.com",
             port: parseInt(process.env.SMTP_PORT ?? "587"),
             secure: false,
             auth: { user: smtpUser, pass: smtpPass },
+            connectionTimeout: 5000,
         });
 
         await transporter.sendMail({
             from: `"Savora" <${smtpUser}>`,
-            to: email,
+            to,
             subject: "Your Savora Verification Code",
             text: `Your OTP code is: ${otp_code}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, you can ignore this email.`,
             html: `
@@ -56,11 +69,6 @@ class OTPServices {
                 </div>
             `,
         });
-
-        return {
-            message: `OTP sent to ${email}`,
-            expiresInMinutes: 10,
-        };
     }
 
     async sendPhoneOTP(phone: string, userId: string) {
