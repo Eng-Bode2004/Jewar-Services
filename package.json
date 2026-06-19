@@ -15,9 +15,10 @@
     "start": "bun run server.ts"
   },
   "dependencies": {
+    "bson": "7.0.0",
     "cors": "^2.8.6",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
-    "mongoose": "^9.7.1"
+    "mongoose": "9.0.1"
   }
 }
