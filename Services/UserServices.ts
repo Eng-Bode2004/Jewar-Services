@@ -4,13 +4,16 @@ import jwt from "jsonwebtoken";
 
 class UserServices {
 
-    async RegisterUserPhoneNumber(phone_number: string, password: string, username: string) {
-        const [existingPhone, existingUsername] = await Promise.all([
-            UserModel.findOne({ phone_number }),
-            UserModel.findOne({ username }),
-        ]);
+    async RegisterUserPhoneNumber(phone_number: string, password: string, username?: string) {
+        const existingPhone = await UserModel.findOne({ phone_number });
         if (existingPhone) throw new Error("Phone number already registered");
-        if (existingUsername) throw new Error("Username already taken");
+
+        if (!username) {
+            username = await this.GenerateRandomUsername();
+        } else {
+            const existingUsername = await UserModel.findOne({ username });
+            if (existingUsername) throw new Error("Username already taken");
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -25,13 +28,16 @@ class UserServices {
 
     /////////////////////////////////////////// Register Using Email ///////////////////////////
 
-    async RegisterUserEmail(email: string, password: string, username: string) {
-        const [existingEmail, existingUsername] = await Promise.all([
-            UserModel.findOne({ email }),
-            UserModel.findOne({ username }),
-        ]);
+    async RegisterUserEmail(email: string, password: string, username?: string) {
+        const existingEmail = await UserModel.findOne({ email });
         if (existingEmail) throw new Error("Email already registered");
-        if (existingUsername) throw new Error("Username already taken");
+
+        if (!username) {
+            username = await this.GenerateRandomUsername();
+        } else {
+            const existingUsername = await UserModel.findOne({ username });
+            if (existingUsername) throw new Error("Username already taken");
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
 

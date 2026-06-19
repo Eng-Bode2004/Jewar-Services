@@ -4,12 +4,12 @@ export function validateRegistration(req: Request, res: Response, next: NextFunc
     const { username, password, confirmPassword, email, phone_number } = req.body;
     const errors: string[] = [];
 
-    if (!username || typeof username !== "string") {
-        errors.push("Username is required");
-    } else if (username.length < 3 || username.length > 30) {
-        errors.push("Username must be between 3 and 30 characters");
-    } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-        errors.push("Username can only contain letters, numbers, and underscores");
+    if (username && typeof username === "string") {
+        if (username.length < 3 || username.length > 30) {
+            errors.push("Username must be between 3 and 30 characters");
+        } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            errors.push("Username can only contain letters, numbers, and underscores");
+        }
     }
 
     if (!password || typeof password !== "string") {
