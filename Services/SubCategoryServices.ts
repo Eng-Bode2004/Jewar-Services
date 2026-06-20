@@ -9,7 +9,7 @@ class SubCategoryServices {
         const name = (data.name as string) || (data.english_name as string) || "";
         if (!name.trim()) throw new Error("Name is required");
         if (!data.categoryId) throw new Error("categoryId is required");
-        const sub = await SubCategory.create({ ...data, name: name.trim(), categoryId: data.categoryId });
+        const sub = await SubCategory.create({ ...data, name: name.trim(), categoryId: data.categoryId as string });
         return sub;
     }
 
@@ -101,12 +101,6 @@ class SubCategoryServices {
         return sub;
     }
 
-
-    async getSubCategoriesByCategory(categoryId: string): Promise<any> {
-        return await SubCategory.find({ categoryId })
-            .populate("categoryId", "name")
-            .sort({ createdAt: -1 });
-    }
 
     async deleteImageFromServices(imageUrl: string): Promise<void> {
         try {
