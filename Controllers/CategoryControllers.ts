@@ -4,7 +4,8 @@ import CategoryServices from "../Services/CategoryServices.ts";
 class CategoryControllers {
     async createCategory(req: Request, res: Response): Promise<Response> {
         try {
-            if (!req.body?.name || !req.body.name.trim()) {
+            const name = (req.body.name as string) || (req.body.english_name as string) || "";
+            if (!name.trim()) {
                 return res.status(400).json({ status: "error", message: "Name is required" });
             }
             const category = await CategoryServices.createCategory(req.body);
