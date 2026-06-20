@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import DishServices from "../Services/DishServices";
+import DishServices from "../Services/DishServices.ts";
 
 class DishController {
     async create(req: Request, res: Response) {
@@ -26,9 +26,23 @@ class DishController {
         }
     }
 
+    async getByLanguage(req: Request, res: Response) {
+        try {
+            const lang = req.params.lang! as string;
+            const result = await DishServices.getByLanguage(lang);
+            res.status(200).json(result);
+        } catch (error: unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error",
+            });
+        }
+    }
+
     async getById(req: Request, res: Response) {
         try {
-            const result = await DishServices.getById(req.params.id);
+            const id = req.params.id! as string;
+            const result = await DishServices.getById(id);
             res.status(200).json(result);
         } catch (error: unknown) {
             res.status(404).json({
@@ -40,7 +54,8 @@ class DishController {
 
     async getBySubcategory(req: Request, res: Response) {
         try {
-            const result = await DishServices.getBySubcategory(req.params.subcategoryId);
+            const subcategoryId = req.params.subcategoryId! as string;
+            const result = await DishServices.getBySubcategory(subcategoryId);
             res.status(200).json(result);
         } catch (error: unknown) {
             res.status(500).json({
@@ -52,7 +67,8 @@ class DishController {
 
     async update(req: Request, res: Response) {
         try {
-            const result = await DishServices.update(req.params.id, req.body);
+            const id = req.params.id! as string;
+            const result = await DishServices.update(id, req.body);
             res.status(200).json(result);
         } catch (error: unknown) {
             res.status(500).json({
@@ -64,7 +80,8 @@ class DishController {
 
     async remove(req: Request, res: Response) {
         try {
-            const result = await DishServices.remove(req.params.id);
+            const id = req.params.id! as string;
+            const result = await DishServices.remove(id);
             res.status(200).json(result);
         } catch (error: unknown) {
             res.status(500).json({

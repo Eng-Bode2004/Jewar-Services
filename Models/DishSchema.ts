@@ -1,31 +1,48 @@
 import mongoose from "mongoose";
 
 const DishSchema = new mongoose.Schema({
-    name: {
-        type: String,
-        required: true,
-        trim: true,
-    },
-    ingredients: [{
-        type: String,
-        trim: true,
-    }],
-    Recipe_steps: [{
-        type: String,
-        trim: true,
-    }],
-    description: {
-        type: String,
-        default: "",
-    },
-    optional: {
-        type: String,
-        default: "",
-    },
+    // ── Multilingual name ──
+    arabic_name: { type: String, default: "" },
+    english_name: { type: String, required: true, trim: true },
+    spanish_name: { type: String, default: "" },
+    French_name: { type: String, default: "" },
+    Chinese_name: { type: String, default: "" },
+
+    // ── Multilingual ingredients ──
+    arabic_ingredients: [{ type: String, trim: true }],
+    english_ingredients: [{ type: String, trim: true }],
+    spanish_ingredients: [{ type: String, trim: true }],
+    french_ingredients: [{ type: String, trim: true }],
+    chinese_ingredients: [{ type: String, trim: true }],
+
+    // ── Multilingual recipe steps ──
+    arabic_Recipe_steps: [{ type: String, trim: true }],
+    english_Recipe_steps: [{ type: String, trim: true }],
+    spanish_Recipe_steps: [{ type: String, trim: true }],
+    french_Recipe_steps: [{ type: String, trim: true }],
+    chinese_Recipe_steps: [{ type: String, trim: true }],
+
+    // ── Multilingual description ──
+    arabic_description: { type: String, default: "" },
+    english_description: { type: String, default: "" },
+    spanish_description: { type: String, default: "" },
+    french_description: { type: String, default: "" },
+    chinese_description: { type: String, default: "" },
+
+    // ── Multilingual optional notes ──
+    arabic_optional: { type: String, default: "" },
+    english_optional: { type: String, default: "" },
+    spanish_optional: { type: String, default: "" },
+    french_optional: { type: String, default: "" },
+    chinese_optional: { type: String, default: "" },
+
+    // ── Relations ──
     Subcategory_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "SubCategory",
     },
+
+    // ── Image ──
     image: {
         type: String,
         default: "",
