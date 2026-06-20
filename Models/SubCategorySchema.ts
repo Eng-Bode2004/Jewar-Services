@@ -19,6 +19,8 @@ const SubCategorySchema = new mongoose.Schema(
         spanish_description: { type: String, default: "" },
         french_description: { type: String, default: "" },
         chinese_description: { type: String, default: "" },
+
+        description: { type: String, default: "" },
     },
     { timestamps: true, versionKey: false }
 );
