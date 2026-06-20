@@ -42,6 +42,19 @@ class CategoryControllers {
         }
     }
 
+    async getByLanguage(req: Request, res: Response): Promise<Response> {
+        try {
+            const lang = req.params.lang as string;
+            const categories = await CategoryServices.getByLanguage(lang);
+            return res.status(200).json({ status: "success", response: categories });
+        } catch (error) {
+            return res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Fetch failed",
+            });
+        }
+    }
+
     async updateCategory(req: Request, res: Response): Promise<Response> {
         try {
             const id = req.params.id as string;

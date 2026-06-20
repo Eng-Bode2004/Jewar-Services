@@ -5,13 +5,10 @@ import SubCategory from "../Models/SubCategorySchema.ts";
 const IMAGES_API = process.env.IMAGES_API_URL || "https://savora-imageservices-production.up.railway.app";
 
 class CategoryServices {
-    async createCategory(data: { name: string; image?: string; description?: string }): Promise<any> {
-        if (!data.name || !data.name.trim()) throw new Error("Name is required");
-        const category = await Category.create({
-            name: data.name.trim(),
-            image: data.image || "",
-            description: data.description || "",
-        });
+    async createCategory(data: Record<string, unknown>): Promise<any> {
+        const name = (data.name as string) || (data.english_name as string) || "";
+        if (!name.trim()) throw new Error("Name is required");
+        const category = await Category.create({ ...data, name: name.trim() });
         return category;
     }
 
@@ -25,11 +22,30 @@ class CategoryServices {
         return await Category.find().sort({ createdAt: -1 });
     }
 
-    async updateCategory(id: string, data: { name?: string; image?: string; description?: string }): Promise<any> {
-        const allowed: Record<string, true> = { name: true, image: true, description: true };
+    async getByLanguage(lang: string): Promise<any> {
+        const categories = await Category.find().sort({ createdAt: -1 });
+        return categories.map((c) => {
+            const doc = c.toObject();
+            return {
+                _id: doc._id,
+                name: (doc as any)[`${lang}_name`] || doc.name,
+                description: (doc as any)[`${lang}_description`] || doc.description,
+                image: doc.image,
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+            };
+        });
+    }
+
+    async updateCategory(id: string, data: Record<string, unknown>): Promise<any> {
+        const allowed: Record<string, true> = {
+            name: true, image: true, description: true,
+            arabic_name: true, english_name: true, spanish_name: true, french_name: true, chinese_name: true,
+            arabic_description: true, english_description: true, spanish_description: true, french_description: true, chinese_description: true,
+        };
         const updates: Record<string, any> = {};
         for (const key of Object.keys(data)) {
-            if (allowed[key]) updates[key] = data[key as keyof typeof data];
+            if (allowed[key]) updates[key] = data[key];
         }
         if (Object.keys(updates).length === 0) throw new Error("No valid fields to update");
 
