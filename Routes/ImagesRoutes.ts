@@ -41,6 +41,7 @@ router.post(
 
 router.post(
     "/dish-image",
+    (req, _res, next) => { req.uploadFolder = "Savora/Dishes"; next(); },
     uploadDishImage.single("image"),
     ImagesControllers.uploadPhoto
 );
