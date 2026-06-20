@@ -40,6 +40,9 @@ class DishService {
                     optional: doc[`${lang}_optional` as keyof typeof doc] || doc.english_optional,
                     Subcategory_id: doc.Subcategory_id,
                     image: doc.image,
+                    price: doc.price,
+                    capacity: doc.capacity,
+                    unit_type: doc.unit_type,
                     createdAt: doc.createdAt,
                     updatedAt: doc.updatedAt,
                 };
