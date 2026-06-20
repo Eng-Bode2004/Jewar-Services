@@ -18,6 +18,7 @@ const CategorySchema = new mongoose.Schema(
         french_description: { type: String, default: "" },
         chinese_description: { type: String, default: "" },
 
+        description: { type: String, default: "" },
         image: { type: String, default: "" },
     },
     {
