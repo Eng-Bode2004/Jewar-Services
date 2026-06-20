@@ -1,6 +1,7 @@
 import { Router } from "express";
 import ImagesControllers from "../Controllers/ImagesControllers.js";
 import upload from "../Middleware/Upload-Middleware.ts";
+import uploadDishImage from "../Middleware/DishImage-Middleware.ts";
 
 declare module "express-serve-static-core" {
     interface Request {
@@ -37,6 +38,14 @@ router.post(
     upload.single("image"),
     ImagesControllers.uploadPhoto
 );
+
+router.post(
+    "/dish-image",
+    uploadDishImage.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.get("/:id", ImagesControllers.getPhotoById);
 
 router.delete("/:id", ImagesControllers.deletePhoto);
 

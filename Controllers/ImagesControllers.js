@@ -9,6 +9,7 @@ class ImagesControllers {
 
             const imageData = {
                 buffer: req.file.buffer,
+                path: req.file.path,
                 mimetype: req.file.mimetype,
                 originalname: req.file.originalname,
                 folder: req.uploadFolder || "Savora/General",
@@ -49,6 +50,26 @@ class ImagesControllers {
             return res.status(status).json({
                 status: "error",
                 message: error.message || "Delete failed",
+            });
+        }
+    }
+
+    async getPhotoById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ status: "error", message: "Image ID is required" });
+            }
+            const image = await ImageServices.getPhotoById(id);
+            return res.status(200).json({
+                status: "success",
+                data: image,
+            });
+        } catch (error) {
+            const status = error.message === "Image not found" ? 404 : 500;
+            return res.status(status).json({
+                status: "error",
+                message: error.message || "Failed to fetch image",
             });
         }
     }

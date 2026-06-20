@@ -3,24 +3,31 @@ import ImagesSchema from "../Models/ImagesShema.js";
 
 class ImageServices {
     async uploadPhoto(data) {
-        const { buffer, mimetype, originalname, folder, title, description } = data;
+        const { buffer, path, mimetype, originalname, folder, title, description } = data;
 
-        const result = await new Promise((resolve, reject) => {
-            const stream = cloudinary.uploader.upload_stream(
-                {
-                    folder,
-                    resource_type: "image",
-                },
-                (error, response) => {
-                    if (error) return reject(error);
-                    return resolve(response);
-                }
-            );
-            stream.end(buffer);
-        });
+        let url;
+        if (path) {
+            // CloudinaryStorage already uploaded — path is the URL
+            url = path;
+        } else if (buffer) {
+            // memoryStorage — upload to Cloudinary manually
+            const result = await new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    { folder, resource_type: "image" },
+                    (error, response) => {
+                        if (error) return reject(error);
+                        return resolve(response);
+                    }
+                );
+                stream.end(buffer);
+            });
+            url = result.secure_url || result.url;
+        } else {
+            throw new Error("No file data provided");
+        }
 
         const newImage = new ImagesSchema({
-            URL: result.secure_url || result.url,
+            URL: url,
             title: title || originalname || "Untitled",
             description: description || "",
         });
@@ -40,6 +47,12 @@ class ImageServices {
 
         await ImagesSchema.findByIdAndDelete(imageId);
         return { deleted: true, publicId };
+    }
+
+    async getPhotoById(imageId) {
+        const image = await ImagesSchema.findById(imageId);
+        if (!image) throw new Error("Image not found");
+        return image;
     }
 
     extractPublicId(url) {
