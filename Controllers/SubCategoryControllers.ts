@@ -42,6 +42,19 @@ class SubCategoryControllers {
         }
     }
 
+    async getByLanguage(req: Request, res: Response): Promise<Response> {
+        try {
+            const lang = req.params.lang as string;
+            const subs = await SubCategoryServices.getByLanguage(lang);
+            return res.status(200).json({ status: "success", response: subs });
+        } catch (error) {
+            return res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Fetch failed",
+            });
+        }
+    }
+
     async getSubCategoriesByCategory(req: Request, res: Response): Promise<Response> {
         try {
             const categoryId = req.params.categoryId as string;

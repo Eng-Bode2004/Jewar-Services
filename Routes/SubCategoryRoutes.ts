@@ -7,6 +7,8 @@ router.post("/", SubCategoryControllers.createSubCategory);
 
 router.get("/", SubCategoryControllers.getAllSubCategories);
 
+router.get("/language/:lang", SubCategoryControllers.getByLanguage);
+
 router.get("/by-category/:categoryId", SubCategoryControllers.getSubCategoriesByCategory);
 
 router.get("/:id", SubCategoryControllers.getSubCategoryById);
