@@ -14,8 +14,11 @@
   "peerDependencies": {
     "typescript": "^5"
   },
+  "overrides": {
+    "bson": "7.2.0"
+  },
   "dependencies": {
-    "bson": ">=7.0.0 <7.3.0",
+    "bson": "7.2.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

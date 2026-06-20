@@ -5,8 +5,8 @@ const DishSchema = new mongoose.Schema({
     arabic_name: { type: String, default: "" },
     english_name: { type: String, required: true, trim: true },
     spanish_name: { type: String, default: "" },
-    French_name: { type: String, default: "" },
-    Chinese_name: { type: String, default: "" },
+    french_name: { type: String, default: "" },
+    chinese_name: { type: String, default: "" },
 
     // ── Multilingual ingredients ──
     arabic_ingredients: [{ type: String, trim: true }],
@@ -30,11 +30,11 @@ const DishSchema = new mongoose.Schema({
     chinese_description: { type: String, default: "" },
 
     // ── Multilingual optional notes ──
-    arabic_optional: { type: String, default: "" },
-    english_optional: { type: String, default: "" },
-    spanish_optional: { type: String, default: "" },
-    french_optional: { type: String, default: "" },
-    chinese_optional: { type: String, default: "" },
+    arabic_optional: [{ type: String, trim: true }],
+    english_optional: [{ type: String, trim: true }],
+    spanish_optional: [{ type: String, trim: true }],
+    french_optional: [{ type: String, trim: true }],
+    chinese_optional: [{ type: String, trim: true }],
 
     // ── Relations ──
     Subcategory_id: {
