@@ -85,7 +85,7 @@ class UserServices {
             userId,
             { role: roleId },
             { new: true }
-        ).populate("role");
+        );
         if (!user) throw new Error("User not found");
         return user;
     }
@@ -95,7 +95,7 @@ class UserServices {
             userId,
             { profile: profileId },
             { new: true }
-        ).populate("profile");
+        );
         if (!user) throw new Error("User not found");
         return user;
     }
@@ -180,13 +180,13 @@ class UserServices {
     }
 
     async FindUserById(id: string) {
-        const user = await UserModel.findById(id).populate("role profile");
+        const user = await UserModel.findById(id);
         if (!user) throw new Error("User not found");
         return user;
     }
 
     async FindAllUsers() {
-        return await UserModel.find().populate("role profile");
+        return await UserModel.find();
     }
 
     async DeleteUser(id: string) {
