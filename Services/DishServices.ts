@@ -41,7 +41,6 @@ class DishService {
                     Subcategory_id: doc.Subcategory_id,
                     image: doc.image,
                     price: doc.price,
-                    capacity: doc.capacity,
                     unit_type: doc.unit_type,
                     createdAt: doc.createdAt,
                     updatedAt: doc.updatedAt,

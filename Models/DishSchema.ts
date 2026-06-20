@@ -42,9 +42,8 @@ const DishSchema = new mongoose.Schema({
         ref: "SubCategory",
     },
 
-    // ── Pricing & Capacity ──
+    // ── Pricing & Unit ──
     price: { type: Number, default: 0, min: 0 },
-    capacity: { type: String, default: "" },
     unit_type: { type: String, enum: ["kg", "pieces"], default: "pieces" },
 
     // ── Image ──
