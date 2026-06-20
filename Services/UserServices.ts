@@ -159,6 +159,10 @@ class UserServices {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) throw new Error("Invalid credentials");
 
+        // Set user as active on login
+        user.isActive = true;
+        await user.save();
+
         const JWT_SECRET = process.env.JWT_SECRET || "savora_jwt_secret_dev";
 
         const token = jwt.sign(
@@ -167,10 +171,25 @@ class UserServices {
             { expiresIn: "7d" }
         );
 
+        // Fetch role details from Role-Services if user has a role assigned
+        let roleData: Record<string, any> | null = null;
+        if (user.role) {
+            try {
+                const ROLE_SERVICE_URL = process.env.ROLE_SERVICE_URL || "https://savorarole-services-production.up.railway.app";
+                const res = await fetch(`${ROLE_SERVICE_URL}/api/v1/roles/${user.role}`);
+                if (res.ok) {
+                    const body = await res.json();
+                    roleData = body.data ?? null;
+                }
+            } catch (err) {
+                console.error("Failed to fetch role details:", err);
+            }
+        }
+
         const userObj = user.toObject();
         const { password: _, ...safeUser } = userObj;
 
-        return { user: safeUser, token };
+        return { user: safeUser, token, role: roleData };
     }
 
     async GetUserLanguage(id: string) {
