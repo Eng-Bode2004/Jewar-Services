@@ -1,6 +1,21 @@
 import mongoose from "mongoose";
 
+const stepStatus = {
+    type: String,
+    enum: ["pending", "in_progress", "verified", "rejected"],
+    default: "pending",
+};
+
 const ChiefProfileSchema = new mongoose.Schema({
+
+    auth_id: {
+        type: String,
+        index: true,
+    },
+
+    phone: {
+        type: String,
+    },
 
     National_ID: {
         type: mongoose.Schema.Types.ObjectId,
@@ -21,10 +36,24 @@ const ChiefProfileSchema = new mongoose.Schema({
         default: false,
     },
 
-    profile_image:{
+    profile_image: {
         type: String,
-    }
+    },
 
-});
+    Health_Certificate: {
+        type: String,
+    },
+
+    Items_Can_Make_Status: stepStatus,
+
+    Address_Status: stepStatus,
+
+    Payment_Method_Status: stepStatus,
+
+    Health_Certificate_Status: stepStatus,
+
+    National_ID_Status: stepStatus,
+
+}, { timestamps: true });
 
 export default mongoose.model("Chief Profile", ChiefProfileSchema);

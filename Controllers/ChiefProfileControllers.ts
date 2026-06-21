@@ -65,7 +65,37 @@ class ChiefProfileController {
 
     async verify(req:Request, res:Response) {
         try {
-            const result = await ChiefProfileServices.verifyProfile(req.params.id);
+            const result = await ChiefProfileServices.verifyProfile(req.params.id as string);
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
+    async verifyStep(req:Request, res:Response) {
+        try {
+            const { step, status } = req.body;
+            const result = await ChiefProfileServices.verifyStep(req.params.id as string, step, status);
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
+    async uploadHealthCertificate(req:Request, res:Response) {
+        try {
+            const { certificateUrl } = req.body;
+            if (!certificateUrl) {
+                res.status(400).json({ status: "error", message: "certificateUrl is required" });
+                return;
+            }
+            const result = await ChiefProfileServices.uploadHealthCertificate(req.params.id as string, certificateUrl);
             res.status(200).json(result);
         } catch (error:unknown) {
             res.status(500).json({

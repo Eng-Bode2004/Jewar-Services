@@ -25,4 +25,10 @@ router.delete("/:id", ChiefProfileControllers.delete);
 // Verify a profile (protected, only Admin)
 router.patch("/:id/verify", ChiefProfileControllers.verify);
 
+// Verify a specific step status
+router.patch("/:id/verify-step", ChiefProfileControllers.verifyStep);
+
+// Upload health certificate URL
+router.patch("/:id/health-certificate", ChiefProfileControllers.uploadHealthCertificate);
+
 export default router;

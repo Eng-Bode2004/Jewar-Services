@@ -59,7 +59,7 @@ class ChiefProfileService {
         }
     }
 
-    // 6️⃣ Optional: Verify profile
+    // 6️⃣ Verify profile (set Is_Verified = true)
     async verifyProfile(profileId) {
         try {
             const verifiedProfile = await ChiefProfileSchema.findByIdAndUpdate(
@@ -71,6 +71,53 @@ class ChiefProfileService {
             return { status: "success", verifiedProfile };
         } catch (error) {
             throw new Error(error.message || "Failed to verify profile");
+        }
+    }
+
+    // 7️⃣ Verify a specific step by field name
+    async verifyStep(profileId, step, status) {
+        try {
+            const validSteps = [
+                "Items_Can_Make_Status",
+                "Address_Status",
+                "Payment_Method_Status",
+                "Health_Certificate_Status",
+                "National_ID_Status",
+            ];
+            if (!validSteps.includes(step)) {
+                throw new Error(`Invalid step: ${step}. Must be one of: ${validSteps.join(", ")}`);
+            }
+            const validStatuses = ["pending", "in_progress", "verified", "rejected"];
+            if (!validStatuses.includes(status)) {
+                throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(", ")}`);
+            }
+            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+                profileId,
+                { [step]: status },
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to verify step");
+        }
+    }
+
+    // 8️⃣ Upload health certificate (store URL)
+    async uploadHealthCertificate(profileId, certificateUrl) {
+        try {
+            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+                profileId,
+                {
+                    Health_Certificate: certificateUrl,
+                    Health_Certificate_Status: "in_progress",
+                },
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to upload health certificate");
         }
     }
 
