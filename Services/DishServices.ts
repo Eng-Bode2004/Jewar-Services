@@ -16,7 +16,7 @@ class DishService {
 
     async getAll() {
         try {
-            const dishes = await DishSchema.find().populate("Subcategory_id");
+            const dishes = await DishSchema.find().sort({ createdAt: -1 });
             return { status: "success", dishes };
         } catch (error) {
             throw new Error(
@@ -27,7 +27,7 @@ class DishService {
 
     async getByLanguage(lang: string) {
         try {
-            const dishes = await DishSchema.find().populate("Subcategory_id");
+            const dishes = await DishSchema.find();
 
             const mapped = dishes.map((d) => {
                 const doc = d.toObject();
@@ -57,7 +57,7 @@ class DishService {
 
     async getById(id: string) {
         try {
-            const dish = await DishSchema.findById(id).populate("Subcategory_id");
+            const dish = await DishSchema.findById(id);
             if (!dish) throw new Error("Dish not found");
             return { status: "success", dish };
         } catch (error) {
