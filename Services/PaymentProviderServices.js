@@ -48,12 +48,12 @@ class PaymentProviderService {
         return { message: "Payment provider deleted successfully" };
     }
 
-    // ➤ Activate / Deactivate provider
-    async toggleStatus(id, status) {
+    // ➤ Activate / Deactivate provider (toggles current status)
+    async toggleStatus(id) {
         const provider = await PaymentProviderModel.findById(id);
         if (!provider) throw new Error("Provider not found");
 
-        provider.is_active = status;
+        provider.is_active = !provider.is_active;
         await provider.save();
 
         return {

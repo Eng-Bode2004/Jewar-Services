@@ -16,6 +16,7 @@ const PaymentProviderModel = new mongoose.Schema({
     type: {
         type: String // 'card','wallet','bank','offline'
     },
+
     is_active: {
         type: Boolean,
         default: true

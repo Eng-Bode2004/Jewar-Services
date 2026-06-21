@@ -48,9 +48,7 @@ class PaymentProviderController {
     async toggleStatus(req, res) {
         try {
             const { id } = req.params;
-            const { status } = req.body;
-
-            const provider = await PaymentProviderServices.toggleStatus(id, status);
+            const provider = await PaymentProviderServices.toggleStatus(id);
             res.json({ status: "success", data: provider });
         } catch (err) {
             res.status(400).json({ status: "error", message: err.message });
