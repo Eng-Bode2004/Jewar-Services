@@ -23,6 +23,24 @@ class UserServices {
             password: hashedPassword,
         });
 
+        const CUSTOMER_PROFILE_SERVICE_URL = process.env.CUSTOMER_PROFILE_SERVICE_URL || "http://localhost:5009";
+        try {
+            const profileRes = await fetch(`${CUSTOMER_PROFILE_SERVICE_URL}/api/v1/customer-profile`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ auth_id: user._id, name: username }),
+            });
+            if (profileRes.ok) {
+                const profileData: any = await profileRes.json();
+                const profileId = profileData?.response?._id || profileData?._id;
+                if (profileId) {
+                    await UserModel.findByIdAndUpdate(user._id, { profile: profileId });
+                }
+            }
+        } catch (err) {
+            console.error("Failed to create customer profile:", err);
+        }
+
         const JWT_SECRET = process.env.JWT_SECRET || "savora_jwt_secret_dev";
         const token = jwt.sign(
             { id: user._id, role: user.role },
@@ -55,6 +73,24 @@ class UserServices {
             email,
             password: hashedPassword,
         });
+
+        const CUSTOMER_PROFILE_SERVICE_URL = process.env.CUSTOMER_PROFILE_SERVICE_URL || "http://localhost:5009";
+        try {
+            const profileRes = await fetch(`${CUSTOMER_PROFILE_SERVICE_URL}/api/v1/customer-profile`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ auth_id: user._id, name: username }),
+            });
+            if (profileRes.ok) {
+                const profileData: any = await profileRes.json();
+                const profileId = profileData?.response?._id || profileData?._id;
+                if (profileId) {
+                    await UserModel.findByIdAndUpdate(user._id, { profile: profileId });
+                }
+            }
+        } catch (err) {
+            console.error("Failed to create customer profile:", err);
+        }
 
         const JWT_SECRET = process.env.JWT_SECRET || "savora_jwt_secret_dev";
         const token = jwt.sign(
@@ -178,7 +214,7 @@ class UserServices {
                 const ROLE_SERVICE_URL = process.env.ROLE_SERVICE_URL || "https://savorarole-services-production.up.railway.app";
                 const res = await fetch(`${ROLE_SERVICE_URL}/api/v1/roles/${user.role}`);
                 if (res.ok) {
-                    const body = await res.json();
+                    const body: any = await res.json();
                     roleData = body.data ?? null;
                 }
             } catch (err) {
@@ -186,10 +222,25 @@ class UserServices {
             }
         }
 
+        // Fetch customer profile if user has one linked
+        let profileData: Record<string, any> | null = null;
+        if (user.profile) {
+            try {
+                const CUSTOMER_PROFILE_SERVICE_URL = process.env.CUSTOMER_PROFILE_SERVICE_URL || "http://localhost:5009";
+                const res = await fetch(`${CUSTOMER_PROFILE_SERVICE_URL}/api/v1/customer-profile/${user.profile}`);
+                if (res.ok) {
+                    const body: any = await res.json();
+                    profileData = body?.response ?? body?.data ?? body ?? null;
+                }
+            } catch (err) {
+                console.error("Failed to fetch customer profile:", err);
+            }
+        }
+
         const userObj = user.toObject();
         const { password: _, ...safeUser } = userObj;
 
-        return { user: safeUser, token, role: roleData };
+        return { user: safeUser, token, role: roleData, profile: profileData };
     }
 
     async GetUserLanguage(id: string) {
