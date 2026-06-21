@@ -1,0 +1,195 @@
+import PreferredDishChiefSchema from "../Models/PreferredDishChiefSchema";
+import DailyDishAvailabilitySchema from "../Models/DailyDishAvailabilitySchema";
+
+const DISH_SERVICE_URL = process.env.DISH_SERVICE_URL || "http://localhost:5002/api/v1/dishes";
+
+class PreferredDishChiefService {
+    // ── Preferred Dishes ─────────────────────────────────────────────────
+
+    async setPreferred(chiefId: string, dishId: string, preferred: boolean) {
+        try {
+            const doc = await PreferredDishChiefSchema.findOneAndUpdate(
+                { chief_id: chiefId, dish_id: dishId },
+                { chief_id: chiefId, dish_id: dishId, preferred },
+                { upsert: true, new: true }
+            );
+            return { status: "success", preferred: doc };
+        } catch (error) {
+            throw new Error(
+                error instanceof Error ? error.message : "Failed to set preferred dish"
+            );
+        }
+    }
+
+    async getPreferredByChief(chiefId: string) {
+        try {
+            const preferred = await PreferredDishChiefSchema.find({
+                chief_id: chiefId,
+                preferred: true,
+            });
+            return { status: "success", preferred };
+        } catch (error) {
+            throw new Error(
+                error instanceof Error ? error.message : "Failed to fetch preferred dishes"
+            );
+        }
+    }
+
+    async removePreferred(chiefId: string, dishId: string) {
+        try {
+            await PreferredDishChiefSchema.findOneAndDelete({
+                chief_id: chiefId,
+                dish_id: dishId,
+            });
+            return { status: "success", message: "Preferred dish removed" };
+        } catch (error) {
+            throw new Error(
+                error instanceof Error ? error.message : "Failed to remove preferred dish"
+            );
+        }
+    }
+
+    // ── Daily Availability ───────────────────────────────────────────────
+
+    async setDailyAvailability(
+        chiefId: string,
+        dishId: string,
+        date: string,
+        piecesAvailable: number
+    ) {
+        try {
+            const availability = await DailyDishAvailabilitySchema.findOneAndUpdate(
+                { chief_id: chiefId, dish_id: dishId, date },
+                {
+                    chief_id: chiefId,
+                    dish_id: dishId,
+                    date,
+                    pieces_available: piecesAvailable,
+                },
+                { upsert: true, new: true }
+            );
+
+            // If this dish is in the chief's preferred list, fetch the recipe
+            const isPreferred = await PreferredDishChiefSchema.findOne({
+                chief_id: chiefId,
+                dish_id: dishId,
+                preferred: true,
+            });
+
+            let recipe: Record<string, unknown> | null = null;
+            if (isPreferred) {
+                try {
+                    const res = await fetch(`${DISH_SERVICE_URL}/${dishId}`);
+                    if (res.ok) {
+                        const dishData = await res.json() as Record<string, unknown>;
+                        const dish = (dishData as Record<string, unknown>).dish as Record<string, unknown> ?? dishData;
+                        recipe = {
+                            name: dish.name,
+                            ingredients: dish.ingredients,
+                            Recipe_steps: dish.Recipe_steps,
+                            description: dish.description,
+                            image: dish.image,
+                        };
+                    }
+                } catch {
+                    // Recipe fetch failed — return availability without recipe
+                }
+            }
+
+            return {
+                status: "success",
+                availability,
+                ...(recipe ? { recipe } : {}),
+            };
+        } catch (error) {
+            throw new Error(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to set daily availability"
+            );
+        }
+    }
+
+    async getAvailabilityByChiefAndDate(chiefId: string, date: string) {
+        try {
+            const availabilities = await DailyDishAvailabilitySchema.find({
+                chief_id: chiefId,
+                date,
+            });
+            return { status: "success", availabilities };
+        } catch (error) {
+            throw new Error(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to fetch availabilities"
+            );
+        }
+    }
+
+    async getAvailabilityByDishAndDate(dishId: string, date: string) {
+        try {
+            const availabilities = await DailyDishAvailabilitySchema.find({
+                dish_id: dishId,
+                date,
+            });
+            return { status: "success", availabilities };
+        } catch (error) {
+            throw new Error(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to fetch availabilities"
+            );
+        }
+    }
+
+    async getAvailabilityByDate(date: string) {
+        try {
+            const availabilities = await DailyDishAvailabilitySchema.find({ date });
+            return { status: "success", availabilities };
+        } catch (error) {
+            throw new Error(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to fetch availabilities"
+            );
+        }
+    }
+
+    async updatePiecesSold(
+        chiefId: string,
+        dishId: string,
+        date: string,
+        piecesSold: number
+    ) {
+        try {
+            const availability = await DailyDishAvailabilitySchema.findOneAndUpdate(
+                { chief_id: chiefId, dish_id: dishId, date },
+                { $inc: { pieces_sold: piecesSold } },
+                { new: true }
+            );
+            if (!availability) throw new Error("Availability record not found");
+            return { status: "success", availability };
+        } catch (error) {
+            throw new Error(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to update pieces sold"
+            );
+        }
+    }
+
+    // ── Dashboard ────────────────────────────────────────────────────────
+
+    async getDashboard(date: string) {
+        try {
+            const availabilities = await DailyDishAvailabilitySchema.find({ date });
+            return { status: "success", date, availabilities };
+        } catch (error) {
+            throw new Error(
+                error instanceof Error ? error.message : "Failed to fetch dashboard"
+            );
+        }
+    }
+}
+
+export default new PreferredDishChiefService();

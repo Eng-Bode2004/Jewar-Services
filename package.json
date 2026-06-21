@@ -1,0 +1,27 @@
+{
+  "name": "preferred-dishes-chief-services",
+  "module": "server.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run server.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "overrides": {
+    "bson": "7.2.0"
+  },
+  "dependencies": {
+    "bson": "7.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "mongoose": "9.0.1"
+  }
+}
