@@ -1,0 +1,29 @@
+{
+  "name": "address-service",
+  "version": "1.0.0",
+  "description": "Address service for graduation project",
+  "main": "server.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run server.ts"
+  },
+  "author": "Abdelrahman Ashraf",
+  "license": "ISC",
+  "dependencies": {
+    "bson": "7.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "mongoose": "^9.0.1",
+    "node-fetch": "^3.3.2"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
