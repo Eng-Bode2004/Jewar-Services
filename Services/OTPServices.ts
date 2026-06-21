@@ -38,9 +38,9 @@ class OTPServices {
                 port,
                 secure: port === 465,
                 auth: { user: smtpUser, pass: smtpPass },
-                connectionTimeout: 5000,
-                greetingTimeout: 5000,
-                socketTimeout: 5000,
+                connectionTimeout: 30000,
+                greetingTimeout: 30000,
+                socketTimeout: 30000,
             });
             await transporter.sendMail({
                 from: `"Savora" <${smtpUser}>`,
@@ -63,8 +63,8 @@ class OTPServices {
             console.log(`✅ Email OTP sent to ${email}`);
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : "Unknown error";
-            console.error(`❌ SMTP failed for ${email}: ${errorMsg}. Falling back to dev mode.`);
-            console.log(`[DEV] Email OTP for ${email}: ${otp_code}`);
+            console.error(`❌ SMTP failed for ${email}: ${errorMsg}`);
+            throw new Error(`Failed to send OTP email: ${errorMsg}`);
         }
 
         return {
