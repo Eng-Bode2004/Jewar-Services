@@ -103,7 +103,20 @@ class ChiefProfileService {
         }
     }
 
-    // 8️⃣ Upload health certificate (store URL)
+    // 8️⃣ Get verification steps status
+    async getVerificationSteps(profileId) {
+        try {
+            const profile = await ChiefProfileSchema.findById(profileId).select(
+                "Items_Can_Make_Status Address_Status Payment_Method_Status Health_Certificate_Status National_ID_Status Is_Verified"
+            );
+            if (!profile) throw new Error("Profile not found");
+            return { status: "success", steps: profile };
+        } catch (error) {
+            throw new Error(error.message || "Failed to get verification steps");
+        }
+    }
+
+    // 9️⃣ Upload health certificate (store URL)
     async uploadHealthCertificate(profileId, certificateUrl) {
         try {
             const updated = await ChiefProfileSchema.findByIdAndUpdate(

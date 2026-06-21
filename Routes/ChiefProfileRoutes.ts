@@ -25,6 +25,9 @@ router.delete("/:id", ChiefProfileControllers.delete);
 // Verify a profile (protected, only Admin)
 router.patch("/:id/verify", ChiefProfileControllers.verify);
 
+// Get all verification steps status
+router.get("/:id/verification-steps", ChiefProfileControllers.getVerificationSteps);
+
 // Verify a specific step status
 router.patch("/:id/verify-step", ChiefProfileControllers.verifyStep);
 

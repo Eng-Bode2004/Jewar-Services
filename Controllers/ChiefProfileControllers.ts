@@ -88,6 +88,18 @@ class ChiefProfileController {
         }
     }
 
+    async getVerificationSteps(req:Request, res:Response) {
+        try {
+            const result = await ChiefProfileServices.getVerificationSteps(req.params.id as string);
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
     async uploadHealthCertificate(req:Request, res:Response) {
         try {
             const { certificateUrl } = req.body;
