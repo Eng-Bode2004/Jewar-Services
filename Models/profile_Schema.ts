@@ -20,10 +20,6 @@ const CustomerProfileSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    address: {
-      type: String,
-      trim: true,
-    },
     avatar: {
       type: String,
     },
@@ -52,6 +48,34 @@ const CustomerProfileSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+
+    payment_method: {
+      type: String,
+      trim: true,
+    },
+
+    Is_Address_Verified: {
+      type: Boolean,
+      default: false,
+    },
+
+    Is_Payment_Method_Verified: {
+      type: Boolean,
+      default: false,
+    },
+
+    IS_Favorite_Items_Verified: {
+      type: Boolean,
+      default: false,
+    },
+
+
+
+
+
+
+
+
   },
   { timestamps: true }
 );

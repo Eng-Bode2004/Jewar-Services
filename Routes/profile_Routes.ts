@@ -18,6 +18,8 @@ router.patch("/:id/referral", ProfileControllers.generateReferralCode);
 
 router.post("/apply-referral", ProfileControllers.applyReferralCode);
 
+router.patch("/:id/verify-step", ProfileControllers.verifyStep);
+
 router.patch("/:id/points/add", ProfileControllers.addPoints);
 
 router.patch("/:id/points/deduct", ProfileControllers.deductPoints);

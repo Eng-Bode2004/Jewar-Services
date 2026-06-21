@@ -125,6 +125,23 @@ class ProfileControllers {
     }
   }
 
+  async verifyStep(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params as { id: string };
+      const { step } = req.body;
+      if (!step) {
+        return res.status(400).json({ status: "error", message: "step is required" });
+      }
+      const profile = await ProfileServices.verifyStep(id, step);
+      return res.status(200).json({ status: "success", response: profile });
+    } catch (error) {
+      return res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Verify step failed",
+      });
+    }
+  }
+
   async deductPoints(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;

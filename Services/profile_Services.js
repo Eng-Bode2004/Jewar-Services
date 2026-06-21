@@ -9,7 +9,7 @@ class CustomerProfileServices {
   }
 
   async editProfile(id, data) {
-    const allowed = ["name", "email", "phone", "address", "avatar", "Is_Verified"];
+    const allowed = ["name", "email", "phone", "address", "avatar", "Is_Verified", "payment_method", "Is_Payment_Method_Verified", "Is_Address_Verified", "IS_Favorite_Items_Verified"];
     const updates = {};
     for (const key of allowed) {
       if (data[key] !== undefined) updates[key] = data[key];
@@ -91,6 +91,35 @@ class CustomerProfileServices {
     if (profile.points < deduction) throw new Error("Insufficient points");
     profile.points -= deduction;
     await profile.save();
+    return profile;
+  }
+
+  async verifyStep(id, step) {
+    const fieldMap = {
+      payment_method: "Is_Payment_Method_Verified",
+      address: "Is_Address_Verified",
+      favorite_items: "IS_Favorite_Items_Verified",
+    };
+
+    const field = fieldMap[step];
+    if (!field) throw new Error(`Invalid step: "${step}". Valid steps: payment_method, address, favorite_items`);
+
+    const profile = await Profile.findById(id);
+    if (!profile) throw new Error("Profile not found");
+
+    profile[field] = true;
+    await profile.save();
+
+    // Check if all 3 steps are done -> auto-verify the customer
+    if (
+      profile.Is_Payment_Method_Verified === true &&
+      profile.Is_Address_Verified === true &&
+      profile.IS_Favorite_Items_Verified === true
+    ) {
+      profile.Is_Verified = true;
+      await profile.save();
+    }
+
     return profile;
   }
 }
