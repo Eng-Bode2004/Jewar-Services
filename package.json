@@ -14,8 +14,11 @@
   "scripts": {
     "start": "bun run server.ts"
   },
+  "overrides": {
+    "bson": "7.2.0"
+  },
   "dependencies": {
-    "bson": "7.0.0",
+    "bson": "7.2.0",
     "cors": "^2.8.6",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
