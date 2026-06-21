@@ -2,12 +2,24 @@ import mongoose from "mongoose";
 
 const CustomerProfileSchema = new mongoose.Schema(
   {
+    auth_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
     name: {
       type: String,
       required: true,
       trim: true,
     },
-
+    email: {
+      type: String,
+      trim: true,
+    },
+    phone: {
+      type: String,
+      trim: true,
+    },
     address: {
       type: String,
       trim: true,
@@ -19,6 +31,10 @@ const CustomerProfileSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+    Is_Verified: {
+      type: Boolean,
+      default: false,
     },
     referral_code: {
       type: String,

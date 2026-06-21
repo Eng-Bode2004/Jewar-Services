@@ -7,6 +7,7 @@ router.post("/", ProfileControllers.createProfile);
 
 router.get("/", ProfileControllers.getAllProfiles);
 
+router.get("/auth/:authId", ProfileControllers.getProfileByAuthId);
 router.get("/:id", ProfileControllers.getProfileById);
 
 router.put("/:id", ProfileControllers.editProfile);

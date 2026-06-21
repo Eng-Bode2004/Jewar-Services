@@ -54,6 +54,19 @@ class ProfileControllers {
     }
   }
 
+  async getProfileByAuthId(req: Request, res: Response): Promise<Response> {
+    try {
+      const { authId } = req.params;
+      const profile = await ProfileServices.getProfileByAuthId(authId);
+      return res.status(200).json({ status: "success", response: profile });
+    } catch (error) {
+      return res.status(404).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Profile not found",
+      });
+    }
+  }
+
   async getAllProfiles(_req: Request, res: Response): Promise<Response> {
     try {
       const profiles = await ProfileServices.getAllProfiles();

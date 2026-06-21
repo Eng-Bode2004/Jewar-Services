@@ -4,12 +4,12 @@ import crypto from "crypto";
 class CustomerProfileServices {
 
   async createProfile(data) {
-    const profile = await Profile.create({ name: data.name });
+    const profile = await Profile.create(data);
     return profile;
   }
 
   async editProfile(id, data) {
-    const allowed = ["name", "email", "phone", "address", "avatar"];
+    const allowed = ["name", "email", "phone", "address", "avatar", "Is_Verified"];
     const updates = {};
     for (const key of allowed) {
       if (data[key] !== undefined) updates[key] = data[key];
@@ -27,6 +27,12 @@ class CustomerProfileServices {
 
   async getProfileById(id) {
     const profile = await Profile.findById(id);
+    if (!profile) throw new Error("Profile not found");
+    return profile;
+  }
+
+  async getProfileByAuthId(authId) {
+    const profile = await Profile.findOne({ auth_id: authId });
     if (!profile) throw new Error("Profile not found");
     return profile;
   }
