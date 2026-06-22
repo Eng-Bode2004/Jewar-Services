@@ -117,6 +117,23 @@ class ChiefProfileController {
         }
     }
 
+    async uploadPaymentMethod(req:Request, res:Response) {
+        try {
+            const { bank_name, account_number, account_holder_name } = req.body;
+            if (!bank_name || !account_number || !account_holder_name) {
+                res.status(400).json({ status: "error", message: "bank_name, account_number, and account_holder_name are required" });
+                return;
+            }
+            const result = await ChiefProfileServices.uploadPaymentMethod(req.params.id as string, { bank_name, account_number, account_holder_name });
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
 }
 
 export default new ChiefProfileController();

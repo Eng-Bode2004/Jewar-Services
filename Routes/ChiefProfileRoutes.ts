@@ -34,4 +34,7 @@ router.patch("/:id/verify-step", ChiefProfileControllers.verifyStep);
 // Upload health certificate URL
 router.patch("/:id/health-certificate", ChiefProfileControllers.uploadHealthCertificate);
 
+// Upload payment method
+router.patch("/:id/payment-method", ChiefProfileControllers.uploadPaymentMethod);
+
 export default router;

@@ -54,6 +54,14 @@ const ChiefProfileSchema = new mongoose.Schema({
 
     National_ID_Status: stepStatus,
 
+
+    Payment_Method:{
+        bank_name: { type: String },
+        account_number: { type: String },
+        account_holder_name: { type: String },
+    }
+
+
 }, { timestamps: true });
 
 export default mongoose.model("Chief Profile", ChiefProfileSchema);

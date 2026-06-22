@@ -134,6 +134,23 @@ class ChiefProfileService {
         }
     }
 
+    // 🔟 Upload payment method
+    async uploadPaymentMethod(profileId, { bank_name, account_number, account_holder_name }) {
+        try {
+            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+                profileId,
+                {
+                    Payment_Method: { bank_name, account_number, account_holder_name },
+                },
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to upload payment method");
+        }
+    }
+
 }
 
 export default new ChiefProfileService();
