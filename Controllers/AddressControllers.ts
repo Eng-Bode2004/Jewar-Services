@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import AddressServices from "../Services/AddressServices";
+import AddressServices from "../Services/AddressServices.js";
 
 class AddressController {
 
