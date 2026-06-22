@@ -40,4 +40,16 @@ router.patch("/:id/payment-method", ChiefProfileControllers.uploadPaymentMethod)
 // Upload national ID images
 router.patch("/:id/national-id", ChiefProfileControllers.uploadNationalId);
 
+// Submit completed verification for admin review
+router.patch("/:id/submit-verification", ChiefProfileControllers.submitForReview);
+
+// Admin: get all chiefs pending review
+router.get("/admin/pending-verifications", ChiefProfileControllers.getPendingVerifications);
+
+// Admin: approve a chief's verification
+router.patch("/:id/approve-verification", ChiefProfileControllers.approveVerification);
+
+// Admin: reject a chief's verification
+router.patch("/:id/reject-verification", ChiefProfileControllers.rejectVerification);
+
 export default router;

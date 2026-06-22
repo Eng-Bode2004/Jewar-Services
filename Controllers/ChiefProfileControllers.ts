@@ -151,6 +151,55 @@ class ChiefProfileController {
         }
     }
 
+    async submitForReview(req:Request, res:Response) {
+        try {
+            const result = await ChiefProfileServices.submitForReview(req.params.id as string);
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(400).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
+    async getPendingVerifications(req:Request, res:Response) {
+        try {
+            const result = await ChiefProfileServices.getPendingVerifications();
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
+    async approveVerification(req:Request, res:Response) {
+        try {
+            const result = await ChiefProfileServices.approveVerification(req.params.id as string);
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
+    async rejectVerification(req:Request, res:Response) {
+        try {
+            const { reason } = req.body;
+            const result = await ChiefProfileServices.rejectVerification(req.params.id as string, reason);
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
 }
 
 export default new ChiefProfileController();

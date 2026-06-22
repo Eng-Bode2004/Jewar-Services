@@ -57,6 +57,15 @@ const ChiefProfileSchema = new mongoose.Schema({
 
     National_ID_Status: stepStatus,
 
+    Verification_Status: {
+        type: String,
+        enum: ["not_submitted", "pending_review", "approved", "rejected"],
+        default: "not_submitted",
+    },
+
+    Rejection_Reason: {
+        type: String,
+    },
 
     Payment_Method:{
         provider: { type: String },

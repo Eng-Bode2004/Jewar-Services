@@ -169,6 +169,84 @@ class ChiefProfileService {
         }
     }
 
+    // 1️⃣2️⃣ Submit for admin review (chef calls this after all steps verified)
+    async submitForReview(profileId) {
+        try {
+            const profile = await ChiefProfileSchema.findById(profileId);
+            if (!profile) throw new Error("Profile not found");
+
+            const steps = [
+                "Health_Certificate_Status",
+                "Address_Status",
+                "National_ID_Status",
+                "Payment_Method_Status",
+                "Items_Can_Make_Status",
+            ];
+            const pending = steps.filter(s => profile[s] !== "verified");
+            if (pending.length > 0) {
+                throw new Error(`Cannot submit: incomplete steps: ${pending.join(", ")}`);
+            }
+
+            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+                profileId,
+                { Verification_Status: "pending_review" },
+                { new: true }
+            );
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to submit for review");
+        }
+    }
+
+    // 1️⃣3️⃣ Get all chiefs pending admin review
+    async getPendingVerifications() {
+        try {
+            const profiles = await ChiefProfileSchema.find({
+                Verification_Status: "pending_review",
+            });
+            return { status: "success", profiles };
+        } catch (error) {
+            throw new Error(error.message || "Failed to fetch pending verifications");
+        }
+    }
+
+    // 1️⃣4️⃣ Approve verification (admin action)
+    async approveVerification(profileId) {
+        try {
+            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+                profileId,
+                {
+                    Verification_Status: "approved",
+                    Is_Verified: true,
+                },
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to approve verification");
+        }
+    }
+
+    // 1️⃣5️⃣ Reject verification (admin action)
+    async rejectVerification(profileId, rejectionReason) {
+        try {
+            const updateFields = { Verification_Status: "rejected" };
+            if (rejectionReason) {
+                updateFields.Rejection_Reason = rejectionReason;
+            }
+            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+                profileId,
+                updateFields,
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to reject verification");
+        }
+    }
+
 }
 
 export default new ChiefProfileService();
