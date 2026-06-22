@@ -12,6 +12,13 @@ declare module "express-serve-static-core" {
 const router = Router();
 
 router.post(
+    "/chief-health-certificate",
+    (req, _res, next) => { req.uploadFolder = "Savora/Chief/HealthCertificate"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
     "/chief-frontID",
     (req, _res, next) => { req.uploadFolder = "Savora/Chief/FrontID"; next(); },
     upload.single("image"),
