@@ -17,9 +17,12 @@ const ChiefProfileSchema = new mongoose.Schema({
         type: String,
     },
 
-    National_ID: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "National ID"
+    National_ID_Front: {
+        type: String,
+    },
+
+    National_ID_Back: {
+        type: String,
     },
 
     name: {

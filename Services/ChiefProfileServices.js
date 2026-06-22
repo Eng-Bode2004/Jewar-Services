@@ -151,6 +151,24 @@ class ChiefProfileService {
         }
     }
 
+    // 1️⃣1️⃣ Upload national ID images
+    async uploadNationalId(profileId, frontImageURL, backImageURL) {
+        try {
+            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+                profileId,
+                {
+                    National_ID_Front: frontImageURL,
+                    National_ID_Back: backImageURL,
+                },
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to upload national ID");
+        }
+    }
+
 }
 
 export default new ChiefProfileService();

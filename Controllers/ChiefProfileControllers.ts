@@ -134,6 +134,23 @@ class ChiefProfileController {
         }
     }
 
+    async uploadNationalId(req:Request, res:Response) {
+        try {
+            const { frontImageURL, backImageURL } = req.body;
+            if (!frontImageURL || !backImageURL) {
+                res.status(400).json({ status: "error", message: "frontImageURL and backImageURL are required" });
+                return;
+            }
+            const result = await ChiefProfileServices.uploadNationalId(req.params.id as string, frontImageURL, backImageURL);
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
 }
 
 export default new ChiefProfileController();

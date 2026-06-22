@@ -37,4 +37,7 @@ router.patch("/:id/health-certificate", ChiefProfileControllers.uploadHealthCert
 // Upload payment method
 router.patch("/:id/payment-method", ChiefProfileControllers.uploadPaymentMethod);
 
+// Upload national ID images
+router.patch("/:id/national-id", ChiefProfileControllers.uploadNationalId);
+
 export default router;
