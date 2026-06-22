@@ -59,9 +59,8 @@ const ChiefProfileSchema = new mongoose.Schema({
 
 
     Payment_Method:{
-        bank_name: { type: String },
-        account_number: { type: String },
-        account_holder_name: { type: String },
+        provider: { type: String },
+        details: { type: String },
     }
 
 

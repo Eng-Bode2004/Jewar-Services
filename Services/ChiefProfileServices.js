@@ -135,12 +135,12 @@ class ChiefProfileService {
     }
 
     // 🔟 Upload payment method
-    async uploadPaymentMethod(profileId, { bank_name, account_number, account_holder_name }) {
+    async uploadPaymentMethod(profileId, { provider, details }) {
         try {
             const updated = await ChiefProfileSchema.findByIdAndUpdate(
                 profileId,
                 {
-                    Payment_Method: { bank_name, account_number, account_holder_name },
+                    Payment_Method: { provider, details },
                 },
                 { new: true }
             );
