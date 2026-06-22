@@ -69,12 +69,10 @@ const CustomerProfileSchema = new mongoose.Schema(
       default: false,
     },
 
-
-
-
-
-
-
+    preferred_dishes: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Dish",
+    }],
 
   },
   { timestamps: true }
