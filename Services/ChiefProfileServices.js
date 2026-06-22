@@ -23,11 +23,36 @@ class ChiefProfileService {
         }
     }
 
-    // 3️⃣ Get all profiles with optional filters
+    // 3️⃣ Get all profiles with optional filters (enriched with address + preferred dishes)
     async getAllProfiles(filter = {}) {
         try {
             const profiles = await ChiefProfileSchema.find(filter)
-            return { status: "success", profiles };
+            const enriched = await Promise.all(profiles.map(async (p) => {
+                const doc = p.toObject ? p.toObject() : { ...p };
+                const id = doc._id?.toString();
+                if (!id) return doc;
+                // fetch address
+                try {
+                    const addrRes = await fetch(`https://savoraaddress-services-production.up.railway.app/api/v1/address/?Profile_id=${id}`);
+                    if (addrRes.ok) {
+                        const addrData = await addrRes.json();
+                        const addrs = addrData?.addresses ?? [];
+                        if (addrs.length > 0) doc.address = addrs[0];
+                    }
+                } catch { /* address unavailable */ }
+                // fetch preferred dishes
+                try {
+                    const prefRes = await fetch(`https://savoradishprefered-services-production.up.railway.app/api/v1/preferred-dishes-chief/preferred/${id}`);
+                    if (prefRes.ok) {
+                        const prefData = await prefRes.json();
+                        doc.preferredDishes = prefData?.preferred ?? [];
+                    } else {
+                        doc.preferredDishes = [];
+                    }
+                } catch { doc.preferredDishes = []; }
+                return doc;
+            }));
+            return { status: "success", profiles: enriched };
         } catch (error) {
             throw new Error(error.message || "Failed to fetch profiles");
         }
@@ -198,13 +223,43 @@ class ChiefProfileService {
         }
     }
 
-    // 1️⃣3️⃣ Get all chiefs pending admin review
+    // 1️⃣3️⃣ Get all chiefs pending admin review (includes address + preferred dishes)
     async getPendingVerifications() {
         try {
             const profiles = await ChiefProfileSchema.find({
                 Verification_Status: "pending_review",
             });
-            return { status: "success", profiles };
+            // enrich each profile with address and preferred dishes
+            const enriched = await Promise.all(profiles.map(async (p) => {
+                const doc = p.toObject();
+                // fetch address from Address-Services
+                try {
+                    const addrRes = await fetch(`https://savoraaddress-services-production.up.railway.app/api/v1/address/?Profile_id=${doc._id}`);
+                    if (addrRes.ok) {
+                        const addrData = await addrRes.json();
+                        const addrs = addrData?.addresses ?? [];
+                        if (addrs.length > 0) {
+                            doc.address = addrs[0];
+                        }
+                    }
+                } catch {
+                    // address unavailable
+                }
+                // fetch preferred dishes from PreferredDishChief-Services
+                try {
+                    const prefRes = await fetch(`https://savoradishprefered-services-production.up.railway.app/api/v1/preferred-dishes-chief/preferred/${doc._id}`);
+                    if (prefRes.ok) {
+                        const prefData = await prefRes.json();
+                        doc.preferredDishes = prefData?.preferred ?? [];
+                    } else {
+                        doc.preferredDishes = [];
+                    }
+                } catch {
+                    doc.preferredDishes = [];
+                }
+                return doc;
+            }));
+            return { status: "success", profiles: enriched };
         } catch (error) {
             throw new Error(error.message || "Failed to fetch pending verifications");
         }
