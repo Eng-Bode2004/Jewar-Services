@@ -52,4 +52,30 @@ router.patch("/:id/approve-verification", ChiefProfileControllers.approveVerific
 // Admin: reject a chief's verification
 router.patch("/:id/reject-verification", ChiefProfileControllers.rejectVerification);
 
+// ── Order Management ─────────────────────────────────────────────────────
+
+// Create a new order (customer checkout)
+router.post("/order", ChiefProfileControllers.createOrder);
+
+// Get all orders for a chef
+router.get("/order/chef/:chefId", ChiefProfileControllers.getChefOrders);
+
+// Get all orders for a customer
+router.get("/order/customer/:customerId", ChiefProfileControllers.getCustomerOrders);
+
+// Get a single order by ID
+router.get("/order/:id", ChiefProfileControllers.getOrderById);
+
+// Admin: verify/reject payment for an order
+router.patch("/order/:id/payment-verify", ChiefProfileControllers.verifyPayment);
+
+// Chef: accept an order
+router.patch("/order/:id/accept", ChiefProfileControllers.acceptOrder);
+
+// Chef: update order status (preparing / ready / completed / cancelled)
+router.patch("/order/:id/status", ChiefProfileControllers.updateOrderStatus);
+
+// Admin: get all orders pending payment verification
+router.get("/admin/pending-payments", ChiefProfileControllers.getPendingPayments);
+
 export default router;

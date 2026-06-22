@@ -1,4 +1,5 @@
 import ChiefProfileSchema from "../Models/ChiefProfileSchema.js";
+import OrderSchema from "../Models/OrderSchema.js";
 
 class ChiefProfileService {
 
@@ -301,6 +302,105 @@ class ChiefProfileService {
             throw new Error(error.message || "Failed to reject verification");
         }
     }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ORDER MANAGEMENT
+  // ═══════════════════════════════════════════════════════════════════
+
+  async createOrder(data) {
+    try {
+      const order = await OrderSchema.create(data);
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to create order");
+    }
+  }
+
+  async getOrdersByChef(chefId) {
+    try {
+      const orders = await OrderSchema.find({ chef_id: chefId }).sort({ createdAt: -1 });
+      return { status: "success", orders };
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch chef orders");
+    }
+  }
+
+  async getOrdersByCustomer(customerId) {
+    try {
+      const orders = await OrderSchema.find({ customer_id: customerId }).sort({ createdAt: -1 });
+      return { status: "success", orders };
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch customer orders");
+    }
+  }
+
+  async getOrderById(orderId) {
+    try {
+      const order = await OrderSchema.findById(orderId);
+      if (!order) throw new Error("Order not found");
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch order");
+    }
+  }
+
+  async verifyPayment(orderId, status) {
+    try {
+      if (!["approved", "rejected"].includes(status)) {
+        throw new Error("Status must be 'approved' or 'rejected'");
+      }
+      const update = { transaction_status: status };
+      if (status === "rejected") {
+        update.order_status = "cancelled";
+      }
+      const order = await OrderSchema.findByIdAndUpdate(orderId, update, { new: true });
+      if (!order) throw new Error("Order not found");
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to verify payment");
+    }
+  }
+
+  async acceptOrder(orderId) {
+    try {
+      const order = await OrderSchema.findByIdAndUpdate(
+        orderId,
+        { order_status: "accepted" },
+        { new: true }
+      );
+      if (!order) throw new Error("Order not found");
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to accept order");
+    }
+  }
+
+  async updateOrderStatus(orderId, orderStatus) {
+    try {
+      const valid = ["preparing", "ready", "completed", "cancelled"];
+      if (!valid.includes(orderStatus)) {
+        throw new Error(`Invalid status. Must be one of: ${valid.join(", ")}`);
+      }
+      const order = await OrderSchema.findByIdAndUpdate(
+        orderId,
+        { order_status: orderStatus },
+        { new: true }
+      );
+      if (!order) throw new Error("Order not found");
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to update order status");
+    }
+  }
+
+  async getPendingPayments() {
+    try {
+      const orders = await OrderSchema.find({ transaction_status: "pending" }).sort({ createdAt: -1 });
+      return { status: "success", orders };
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch pending payments");
+    }
+  }
 
 }
 

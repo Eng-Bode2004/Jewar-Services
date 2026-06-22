@@ -201,6 +201,106 @@ class ChiefProfileController {
         }
     }
 
+  // ── Orders ─────────────────────────────────────────────────────────────
+
+  async createOrder(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.createOrder(req.body);
+      res.status(201).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async getChefOrders(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.getOrdersByChef(req.params.chefId);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(500).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async getCustomerOrders(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.getOrdersByCustomer(req.params.customerId);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(500).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async getOrderById(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.getOrderById(req.params.id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(404).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async verifyPayment(req:Request, res:Response) {
+    try {
+      const { status } = req.body;
+      const result = await ChiefProfileServices.verifyPayment(req.params.id, status);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async acceptOrder(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.acceptOrder(req.params.id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async updateOrderStatus(req:Request, res:Response) {
+    try {
+      const { order_status } = req.body;
+      const result = await ChiefProfileServices.updateOrderStatus(req.params.id, order_status);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async getPendingPayments(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.getPendingPayments();
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(500).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
 }
 
 export default new ChiefProfileController();
