@@ -1,4 +1,4 @@
-import AddressSchema from "../Models/Address_Schema.js";
+import AddressSchema from "../Models/Address_Schema.ts";
 
 const AZ_CHECK_URL = process.env.AZ_CHECK_URL || "https://savora-availabilityzoneservices-production.up.railway.app/api/v1/az/check-location";
 

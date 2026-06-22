@@ -9,6 +9,8 @@ const app = express();
 app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE", "PATCH"], credentials: true }));
 app.use(express.json());
 
+app.get("/health", (_req, res) => res.json({ status: "ok", service: "address" }));
+
 app.use("/api/v1/address", AddressRoutes);
 
 const PORT = process.env.PORT || 5007;
