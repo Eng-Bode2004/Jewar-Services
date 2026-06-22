@@ -17,6 +17,11 @@ const PaymentProviderModel = new mongoose.Schema({
         type: String // 'card','wallet','bank','offline'
     },
 
+    key: {
+        type: String, // wallet/account number customers send money to
+        default: ''
+    },
+
     is_active: {
         type: Boolean,
         default: true
