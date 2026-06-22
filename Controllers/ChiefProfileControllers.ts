@@ -29,7 +29,8 @@ class ChiefProfileController {
 
     async getAll(req:Request, res:Response) {
         try {
-            const result = await ChiefProfileServices.getAllProfiles();
+            const filter = req.query || {};
+            const result = await ChiefProfileServices.getAllProfiles(filter);
             res.status(200).json(result);
         } catch (error:unknown) {
             res.status(500).json({
