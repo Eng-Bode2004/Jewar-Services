@@ -53,6 +53,13 @@ router.post(
     ImagesControllers.uploadPhoto
 );
 
+router.post(
+    "/payment-image",
+    (req, _res, next) => { req.uploadFolder = "Savora/Payments"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
 router.get("/:id", ImagesControllers.getPhotoById);
 
 router.delete("/:id", ImagesControllers.deletePhoto);
