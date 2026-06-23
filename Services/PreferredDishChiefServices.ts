@@ -1,7 +1,13 @@
 import PreferredDishChiefSchema from "../Models/PreferredDishChiefSchema";
 import DailyDishAvailabilitySchema from "../Models/DailyDishAvailabilitySchema";
+import mongoose from "mongoose";
 
 const DISH_SERVICE_URL = process.env.DISH_SERVICE_URL || "http://localhost:5002/api/v1/dishes";
+
+const ChiefProfileSchema = new mongoose.Schema({
+    kitchen_open: { type: Boolean, default: true },
+}, { strict: false });
+const ChiefProfile = mongoose.models["Chief Profile"] || mongoose.model("Chief Profile", ChiefProfileSchema);
 
 class PreferredDishChiefService {
     // ── Preferred Dishes ─────────────────────────────────────────────────
@@ -224,6 +230,17 @@ class PreferredDishChiefService {
                     available: a.pieces_available,
                     pieces_sold: a.pieces_sold,
                 });
+            }
+
+            // Filter out chefs whose kitchen is closed
+            const chefIds = [...chefMap.keys()];
+            const openChefs = await ChiefProfile.find({
+                _id: { $in: chefIds },
+                kitchen_open: { $ne: false },
+            }).select("_id");
+            const openIds = new Set(openChefs.map((c: any) => c._id.toString()));
+            for (const cid of chefIds) {
+                if (!openIds.has(cid)) chefMap.delete(cid);
             }
 
             // Evaluate each chef
