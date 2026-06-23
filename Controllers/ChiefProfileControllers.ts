@@ -253,8 +253,8 @@ class ChiefProfileController {
 
   async verifyPayment(req:Request, res:Response) {
     try {
-      const { status } = req.body;
-      const result = await ChiefProfileServices.verifyPayment(req.params.id, status);
+      const { status, chef_id } = req.body;
+      const result = await ChiefProfileServices.verifyPayment(req.params.id, status, chef_id);
       res.status(200).json(result);
     } catch (error:unknown) {
       res.status(400).json({

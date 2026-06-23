@@ -1,5 +1,17 @@
 import ChiefProfileSchema from "../Models/ChiefProfileSchema.js";
 import OrderSchema from "../Models/OrderSchema.js";
+import mongoose from "mongoose";
+
+const DailyDishAvailabilitySchema = new mongoose.Schema({
+    chief_id: { type: mongoose.Schema.Types.ObjectId, ref: "Chief Profile", required: true },
+    dish_id: { type: mongoose.Schema.Types.ObjectId, ref: "Dish", required: true },
+    date: { type: String, required: true },
+    pieces_available: { type: Number, required: true, min: 0 },
+    pieces_sold: { type: Number, default: 0, min: 0 },
+}, { timestamps: true });
+DailyDishAvailabilitySchema.index({ chief_id: 1, dish_id: 1, date: 1 }, { unique: true });
+const DailyDishAvailability = mongoose.models.DailyDishAvailability ||
+    mongoose.model("DailyDishAvailability", DailyDishAvailabilitySchema);
 
 class ChiefProfileService {
 
@@ -344,18 +356,58 @@ class ChiefProfileService {
     }
   }
 
-  async verifyPayment(orderId, status) {
+  async verifyPayment(orderId, status, bodyChefId) {
     try {
       if (!["approved", "rejected"].includes(status)) {
         throw new Error("Status must be 'approved' or 'rejected'");
       }
+      const order = await OrderSchema.findById(orderId);
+      if (!order) throw new Error("Order not found");
+
       const update = { transaction_status: status };
       if (status === "rejected") {
         update.order_status = "cancelled";
       }
-      const order = await OrderSchema.findByIdAndUpdate(orderId, update, { new: true });
-      if (!order) throw new Error("Order not found");
-      return { status: "success", order };
+
+      // Auto-assign chef if order has none, items are present, and payment is approved
+      if (status === "approved" && !order.chef_id && order.items?.length) {
+        const now = new Date();
+        const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const dishIds = [...new Set(order.items.map(i => i.dish_id))];
+        const availabilities = await DailyDishAvailability.find({ dish_id: { $in: dishIds }, date });
+        const chefMap = new Map();
+        for (const a of availabilities) {
+          const cid = a.chief_id.toString();
+          if (!chefMap.has(cid)) chefMap.set(cid, new Map());
+          chefMap.get(cid).set(a.dish_id.toString(), { available: a.pieces_available, sold: a.pieces_sold });
+        }
+        let bestChef = null;
+        let bestScore = -1;
+        for (const [cid, dishMap] of chefMap) {
+          let canFulfill = true;
+          let totalRemaining = 0;
+          for (const item of order.items) {
+            const stock = dishMap.get(item.dish_id);
+            if (!stock) { canFulfill = false; break; }
+            const remaining = stock.available - stock.sold;
+            if (remaining < item.qty) { canFulfill = false; break; }
+            totalRemaining += remaining;
+          }
+          if (canFulfill && totalRemaining > bestScore) {
+            bestScore = totalRemaining;
+            bestChef = cid;
+          }
+        }
+        if (bestChef) update.chef_id = bestChef;
+      }
+
+      // Fallback: use chef_id provided in request body if order still has none
+      if (!order.chef_id && bodyChefId) {
+        update.chef_id = bodyChefId;
+      }
+
+      const updated = await OrderSchema.findByIdAndUpdate(orderId, update, { new: true });
+      return { status: "success", order: updated };
     } catch (error) {
       throw new Error(error.message || "Failed to verify payment");
     }
