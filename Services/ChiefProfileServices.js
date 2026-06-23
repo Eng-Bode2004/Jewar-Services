@@ -454,6 +454,73 @@ class ChiefProfileService {
     }
   }
 
+  async getChefEarnings(chefId) {
+    try {
+      const orders = await OrderSchema.find({
+        chef_id: chefId,
+        transaction_status: "approved",
+        order_status: "completed",
+      }).sort({ createdAt: -1 });
+
+      const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+      const appFee = totalRevenue * 0.1;
+      const netEarnings = totalRevenue - appFee;
+
+      const dailyTotals = {};
+      for (const o of orders) {
+        const d = o.createdAt ? new Date(o.createdAt) : new Date();
+        const key = d.toLocaleDateString("en-US", { weekday: "short" });
+        dailyTotals[key] = (dailyTotals[key] || 0) + (o.total || 0);
+      }
+      const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const days = dayOrder.map((label) => {
+        const maxVal = Math.max(...Object.values(dailyTotals), 1);
+        return {
+          dayLabel: label[0],
+          percent: maxVal > 0 ? ((dailyTotals[label] || 0) / maxVal) * 100 : 0,
+          highlighted: label === new Date().toLocaleDateString("en-US", { weekday: "short" }),
+        };
+      });
+
+      const recent = orders.slice(0, 5).map((o) => ({
+        orderId: o._id.toString().slice(-4).toUpperCase(),
+        icon: "receipt",
+        timeLabel: o.createdAt
+          ? new Date(o.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : "",
+        amount: o.total || 0,
+      }));
+
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      const weekOrders = orders.filter((o) => o.createdAt && new Date(o.createdAt) >= weekStart);
+      const weekRevenue = weekOrders.reduce((s, o) => s + (o.total || 0), 0);
+      const weekFee = weekRevenue * 0.1;
+      const weekNet = weekRevenue - weekFee;
+      const prevWeekOrders = orders.filter(
+        (o) => o.createdAt && new Date(o.createdAt) < weekStart && new Date(o.createdAt) >= new Date(weekStart.getTime() - 7 * 86400000)
+      );
+      const prevWeekRevenue = prevWeekOrders.reduce((s, o) => s + (o.total || 0), 0);
+      const changePercent = prevWeekRevenue > 0 ? ((weekRevenue - prevWeekRevenue) / prevWeekRevenue) * 100 : 0;
+
+      return {
+        status: "success",
+        earnings: {
+          totalRevenue: Math.round(totalRevenue * 100) / 100,
+          appFee: Math.round(appFee * 100) / 100,
+          netEarnings: Math.round(netEarnings * 100) / 100,
+          orderCount: orders.length,
+          weekNet: Math.round(weekNet * 100) / 100,
+          changePercent: Math.round(changePercent * 100) / 100,
+          days,
+          recent,
+        },
+      };
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch chef earnings");
+    }
+  }
+
 }
 
 export default new ChiefProfileService();

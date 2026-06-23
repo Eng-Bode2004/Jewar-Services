@@ -75,6 +75,9 @@ router.patch("/order/:id/accept", ChiefProfileControllers.acceptOrder);
 // Chef: update order status (preparing / ready / completed / cancelled)
 router.patch("/order/:id/status", ChiefProfileControllers.updateOrderStatus);
 
+// Chef: get earnings summary (completed orders, 10% fee)
+router.get("/order/chef/:chefId/earnings", ChiefProfileControllers.getChefEarnings);
+
 // Admin: get all orders pending payment verification
 router.get("/admin/pending-payments", ChiefProfileControllers.getPendingPayments);
 

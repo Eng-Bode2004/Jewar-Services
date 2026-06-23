@@ -301,6 +301,18 @@ class ChiefProfileController {
     }
   }
 
+  async getChefEarnings(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.getChefEarnings(req.params.chefId);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(500).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
 }
 
 export default new ChiefProfileController();
