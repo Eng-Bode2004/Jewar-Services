@@ -74,6 +74,48 @@ router.post(
     ImagesControllers.uploadPhoto
 );
 
+router.post(
+    "/driver-vehicle-image",
+    (req, _res, next) => { req.uploadFolder = "Savora/Driver/Vehicle"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
+    "/driver-id-front",
+    (req, _res, next) => { req.uploadFolder = "Savora/Driver/IDFront"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
+    "/driver-id-back",
+    (req, _res, next) => { req.uploadFolder = "Savora/Driver/IDBack"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
+    "/driver-license-front",
+    (req, _res, next) => { req.uploadFolder = "Savora/Driver/LicenseFront"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
+    "/driver-license-back",
+    (req, _res, next) => { req.uploadFolder = "Savora/Driver/LicenseBack"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
+    "/driver-vehicle-license",
+    (req, _res, next) => { req.uploadFolder = "Savora/Driver/VehicleLicense"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
 router.get("/:id", ImagesControllers.getPhotoById);
 
 router.delete("/:id", ImagesControllers.deletePhoto);
