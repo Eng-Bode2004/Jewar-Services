@@ -27,7 +27,19 @@ class PreferredDishChiefService {
                 chief_id: chiefId,
                 preferred: true,
             });
-            return { status: "success", preferred };
+            const enriched = await Promise.all(preferred.map(async (p) => {
+                const doc: any = p.toObject ? p.toObject() : { ...p };
+                try {
+                    const res = await fetch(`${DISH_SERVICE_URL}/${p.dish_id}`);
+                    if (res.ok) {
+                        const dishData: any = await res.json();
+                        const dish = dishData.dish || dishData;
+                        doc.dish_name = dish.english_name || dish.name || '';
+                    }
+                } catch { /* ignore */ }
+                return doc;
+            }));
+            return { status: "success", preferred: enriched };
         } catch (error) {
             throw new Error(
                 error instanceof Error ? error.message : "Failed to fetch preferred dishes"
