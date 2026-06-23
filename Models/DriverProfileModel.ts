@@ -51,6 +51,9 @@ const DriverProfileSchema = new mongoose.Schema({
             type: String,
             trim: true,
         },
+        image: {
+            type: String,
+        },
     },
 
     license: {
@@ -65,6 +68,9 @@ const DriverProfileSchema = new mongoose.Schema({
             type: String,
         },
         back_image: {
+            type: String,
+        },
+        vehicle_license_image: {
             type: String,
         },
     },
