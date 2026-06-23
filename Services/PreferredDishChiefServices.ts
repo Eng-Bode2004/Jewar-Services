@@ -116,7 +116,20 @@ class PreferredDishChiefService {
                 chief_id: chiefId,
                 date,
             });
-            return { status: "success", availabilities };
+            // Enrich with dish names
+            const enriched = await Promise.all(availabilities.map(async (a) => {
+                const doc = a.toObject ? a.toObject() : { ...a } as Record<string, unknown>;
+                try {
+                    const res = await fetch(`${DISH_SERVICE_URL}/${a.dish_id}`);
+                    if (res.ok) {
+                        const dishData = await res.json() as Record<string, unknown>;
+                        const dish = (dishData.dish as Record<string, unknown> ?? dishData) as Record<string, unknown>;
+                        doc.dish_name = (dish.english_name as string) || (dish.name as string) || '';
+                    }
+                } catch { /* ignore */ }
+                return doc;
+            }));
+            return { status: "success", availabilities: enriched };
         } catch (error) {
             throw new Error(
                 error instanceof Error
@@ -174,6 +187,63 @@ class PreferredDishChiefService {
                 error instanceof Error
                     ? error.message
                     : "Failed to update pieces sold"
+            );
+        }
+    }
+
+    // ── Best Chef Assignment ────────────────────────────────────────────
+
+    async findBestChef(items: { dish_id: string; qty: number }[], date: string) {
+        try {
+            const dishIds = [...new Set(items.map(i => i.dish_id))];
+
+            // Find all chefs who have ANY of these dishes available today
+            const all = await DailyDishAvailabilitySchema.find({
+                dish_id: { $in: dishIds },
+                date,
+            });
+
+            // Group by chef
+            const chefMap = new Map<string, Map<string, { available: number; pieces_sold: number }>>();
+            for (const a of all) {
+                const cid = a.chief_id.toString();
+                if (!chefMap.has(cid)) chefMap.set(cid, new Map());
+                chefMap.get(cid)!.set(a.dish_id.toString(), {
+                    available: a.pieces_available,
+                    pieces_sold: a.pieces_sold,
+                });
+            }
+
+            // Evaluate each chef
+            let bestChef: string | null = null;
+            let bestScore = -1;
+
+            for (const [chefId, dishMap] of chefMap) {
+                let canFulfillAll = true;
+                let totalRemaining = 0;
+
+                for (const item of items) {
+                    const stock = dishMap.get(item.dish_id);
+                    if (!stock) { canFulfillAll = false; break; }
+                    const remaining = stock.available - stock.pieces_sold;
+                    if (remaining < item.qty) { canFulfillAll = false; break; }
+                    totalRemaining += remaining;
+                }
+
+                if (canFulfillAll && totalRemaining > bestScore) {
+                    bestScore = totalRemaining;
+                    bestChef = chefId;
+                }
+            }
+
+            if (!bestChef) {
+                throw new Error("No chef available to fulfill this order");
+            }
+
+            return { status: "success", chef_id: bestChef };
+        } catch (error) {
+            throw new Error(
+                error instanceof Error ? error.message : "Failed to find best chef"
             );
         }
     }

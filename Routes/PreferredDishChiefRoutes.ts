@@ -15,6 +15,9 @@ router.get("/availability/dish/:dishId/date/:date", PreferredDishChiefController
 router.get("/availability/date/:date", PreferredDishChiefControllers.getAvailabilityByDate);
 router.patch("/availability/:chiefId/:dishId/:date/sold", PreferredDishChiefControllers.updatePiecesSold);
 
+// ── Best Chef Assignment ──────────────────────────────────────────────
+router.post("/best-chef", PreferredDishChiefControllers.findBestChef);
+
 // ── Dashboard ──────────────────────────────────────────────────────────
 router.get("/dashboard/:date", PreferredDishChiefControllers.getDashboard);
 

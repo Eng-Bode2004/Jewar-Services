@@ -134,6 +134,21 @@ class PreferredDishChiefController {
         }
     }
 
+    // ── Best Chef Assignment ────────────────────────────────────────────
+
+    async findBestChef(req: Request, res: Response) {
+        try {
+            const { items, date } = req.body;
+            const result = await PreferredDishChiefServices.findBestChef(items, date);
+            res.status(200).json(result);
+        } catch (error: unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error",
+            });
+        }
+    }
+
     // ── Dashboard ────────────────────────────────────────────────────────
 
     async getDashboard(req: Request, res: Response) {
