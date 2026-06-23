@@ -54,6 +54,20 @@ router.post(
 );
 
 router.post(
+    "/customer-profile-image",
+    (req, _res, next) => { req.uploadFolder = "Savora/Customer/ProfileImage"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
+    "/chief-profile-image",
+    (req, _res, next) => { req.uploadFolder = "Savora/Chief/ProfileImage"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
     "/payment-image",
     (req, _res, next) => { req.uploadFolder = "Savora/Payments"; next(); },
     upload.single("image"),
