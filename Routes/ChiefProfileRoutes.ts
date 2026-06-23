@@ -52,6 +52,9 @@ router.patch("/:id/approve-verification", ChiefProfileControllers.approveVerific
 // Admin: reject a chief's verification
 router.patch("/:id/reject-verification", ChiefProfileControllers.rejectVerification);
 
+// Chef: toggle kitchen open/closed
+router.patch("/:id/kitchen-status", ChiefProfileControllers.setKitchenStatus);
+
 // ── Order Management ─────────────────────────────────────────────────────
 
 // Create a new order (customer checkout)

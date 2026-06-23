@@ -313,6 +313,19 @@ class ChiefProfileController {
     }
   }
 
+  async setKitchenStatus(req:Request, res:Response) {
+    try {
+      const { kitchen_open } = req.body;
+      const result = await ChiefProfileServices.setKitchenStatus(req.params.id, kitchen_open);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
 }
 
 export default new ChiefProfileController();

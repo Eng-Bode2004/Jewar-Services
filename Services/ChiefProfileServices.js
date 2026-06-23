@@ -381,6 +381,15 @@ class ChiefProfileService {
           if (!chefMap.has(cid)) chefMap.set(cid, new Map());
           chefMap.get(cid).set(a.dish_id.toString(), { available: a.pieces_available, sold: a.pieces_sold });
         }
+
+        // Filter out chefs whose kitchen is closed
+        const chefIds = [...chefMap.keys()];
+        const openChefs = await ChiefProfileSchema.find({ _id: { $in: chefIds }, kitchen_open: { $ne: false } }).select("_id");
+        const openIds = new Set(openChefs.map(c => c._id.toString()));
+        for (const cid of chefIds) {
+          if (!openIds.has(cid)) chefMap.delete(cid);
+        }
+
         let bestChef = null;
         let bestScore = -1;
         for (const [cid, dishMap] of chefMap) {
@@ -518,6 +527,20 @@ class ChiefProfileService {
       };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch chef earnings");
+    }
+  }
+
+  async setKitchenStatus(profileId, kitchenOpen) {
+    try {
+      const updated = await ChiefProfileSchema.findByIdAndUpdate(
+        profileId,
+        { kitchen_open: kitchenOpen },
+        { new: true }
+      );
+      if (!updated) throw new Error("Profile not found");
+      return { status: "success", kitchen_open: updated.kitchen_open };
+    } catch (error) {
+      throw new Error(error.message || "Failed to update kitchen status");
     }
   }
 

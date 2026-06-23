@@ -67,6 +67,11 @@ const ChiefProfileSchema = new mongoose.Schema({
         type: String,
     },
 
+    kitchen_open: {
+        type: Boolean,
+        default: true,
+    },
+
     Payment_Method:{
         provider: { type: String },
         details: { type: String },
