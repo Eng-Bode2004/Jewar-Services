@@ -81,10 +81,10 @@ class PreferredDishChiefService {
                 try {
                     const res = await fetch(`${DISH_SERVICE_URL}/${dishId}`);
                     if (res.ok) {
-                        const dishData = await res.json() as Record<string, unknown>;
-                        const dish = (dishData as Record<string, unknown>).dish as Record<string, unknown> ?? dishData;
+                        const dishData: any = await res.json();
+                        const dish = dishData.dish || dishData;
                         recipe = {
-                            name: dish.name,
+                            name: dish.english_name || dish.name || '',
                             ingredients: dish.ingredients,
                             Recipe_steps: dish.Recipe_steps,
                             description: dish.description,
@@ -118,13 +118,13 @@ class PreferredDishChiefService {
             });
             // Enrich with dish names
             const enriched = await Promise.all(availabilities.map(async (a) => {
-                const doc = a.toObject ? a.toObject() : { ...a } as Record<string, unknown>;
+                const doc: any = a.toObject ? a.toObject() : { ...a };
                 try {
                     const res = await fetch(`${DISH_SERVICE_URL}/${a.dish_id}`);
                     if (res.ok) {
-                        const dishData = await res.json() as Record<string, unknown>;
-                        const dish = (dishData.dish as Record<string, unknown> ?? dishData) as Record<string, unknown>;
-                        doc.dish_name = (dish.english_name as string) || (dish.name as string) || '';
+                        const dishData: any = await res.json();
+                        const dish = dishData.dish || dishData;
+                        doc.dish_name = dish.english_name || dish.name || '';
                     }
                 } catch { /* ignore */ }
                 return doc;

@@ -36,7 +36,8 @@ class PreferredDishChiefController {
 
     async removePreferred(req: Request, res: Response) {
         try {
-            const { chiefId, dishId } = req.body;
+            const chiefId = req.params.chiefId as string;
+            const dishId = req.params.dishId as string;
             const result = await PreferredDishChiefServices.removePreferred(
                 chiefId,
                 dishId

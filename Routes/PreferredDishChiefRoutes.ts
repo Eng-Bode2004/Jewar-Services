@@ -6,7 +6,7 @@ const router = express.Router();
 // ── Preferred Dishes ───────────────────────────────────────────────────
 router.post("/preferred", PreferredDishChiefControllers.setPreferred);
 router.get("/preferred/:chiefId", PreferredDishChiefControllers.getPreferredByChief);
-router.delete("/preferred", PreferredDishChiefControllers.removePreferred);
+router.delete("/preferred/:chiefId/:dishId", PreferredDishChiefControllers.removePreferred);
 
 // ── Daily Availability ─────────────────────────────────────────────────
 router.post("/availability", PreferredDishChiefControllers.setDailyAvailability);
