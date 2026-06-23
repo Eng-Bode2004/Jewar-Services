@@ -11,7 +11,7 @@ const OrderItemSchema = new mongoose.Schema({
 const OrderSchema = new mongoose.Schema({
   customer_id: { type: String, required: true, index: true },
   customer_name: { type: String },
-  chef_id: { type: String, required: true, index: true },
+  chef_id: { type: String, index: true },
   items: { type: [OrderItemSchema], required: true },
   total: { type: Number, required: true },
   payment_method: { type: String },
