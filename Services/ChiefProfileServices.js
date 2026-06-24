@@ -661,6 +661,35 @@ class ChiefProfileService {
     }
   }
 
+  async rateOrder(orderId, rating, driverRating, comment) {
+    try {
+      const order = await OrderSchema.findById(orderId);
+      if (!order) throw new Error("Order not found");
+      if (order.order_status !== "completed") throw new Error("Order must be completed before rating");
+
+      order.rating = rating;
+      if (driverRating) order.driver_rating = driverRating;
+      if (comment) order.review_comment = comment;
+      await order.save();
+
+      // Update driver rating via API
+      if (driverRating && order.driver_id) {
+        try {
+          const driverApiUrl = process.env.DRIVER_SERVICE_URL || "https://savora-driverprofileservices-production.up.railway.app/api/v2/driver-profile";
+          await fetch(`${driverApiUrl}/${order.driver_id}/rating`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rating: driverRating })
+          });
+        } catch (_) {}
+      }
+
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to rate order");
+    }
+  }
+
 }
 
 export default new ChiefProfileService();

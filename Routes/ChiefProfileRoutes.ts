@@ -101,4 +101,7 @@ router.patch("/order/:id/driver-accept", ChiefProfileControllers.acceptOrderDriv
 // Driver: deliver an order
 router.patch("/order/:id/driver-deliver", ChiefProfileControllers.deliverOrderDriver);
 
+// Customer: rate order and driver after completion
+router.post("/order/:id/rate", ChiefProfileControllers.rateOrder);
+
 export default router;

@@ -34,6 +34,9 @@ const OrderSchema = new mongoose.Schema({
     label: String,
   },
   rejection_reason: { type: String },
+  rating: { type: Number, min: 1, max: 5 },
+  driver_rating: { type: Number, min: 1, max: 5 },
+  review_comment: { type: String },
 }, { timestamps: true });
 
 export default mongoose.model("Order", OrderSchema);
