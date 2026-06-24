@@ -1,6 +1,5 @@
 import ChiefProfileSchema from "../Models/ChiefProfileSchema.js";
 import OrderSchema from "../Models/OrderSchema.js";
-import DriverProfileSchema from "../../DriverProfile-Services/Models/DriverProfileModel.ts";
 import mongoose from "mongoose";
 
 const DailyDishAvailabilitySchema = new mongoose.Schema({
@@ -616,14 +615,16 @@ class ChiefProfileService {
          }
       }
 
-      // Update driver earnings
+      // Update driver earnings via API call
       if (order.driver_id) {
-         const driver = await DriverProfileSchema.findById(order.driver_id);
-         if (driver) {
-             if(!driver.earnings) driver.earnings = { total: 0, this_week: 0, pending: 0 };
-             driver.earnings.pending += 15;
-             await driver.save();
-         }
+         try {
+            const driverApiUrl = process.env.DRIVER_SERVICE_URL || "https://savora-driverprofileservices-production.up.railway.app/api/v2/driver-profile";
+            await fetch(`${driverApiUrl}/${order.driver_id}/earnings`, {
+               method: "PATCH",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({ amount: 15 })
+            });
+         } catch (_) {}
       }
 
       return { status: "success", order };
