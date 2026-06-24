@@ -168,6 +168,100 @@ class UserControllers {
         }
     }
 
+    // ── Phone OTP Login ───────────────────────────────────────────────────
+
+    async findOrCreateByPhone(req: Request, res: Response) {
+        try {
+            const { phone } = req.body;
+            if (!phone) {
+                res.status(400).json({ error: "Phone number is required", statusCode: 400 });
+                return;
+            }
+            const result = await UserServices.FindOrCreateByPhone(phone);
+            res.status(200).json({
+                message: result.isNew ? "User created successfully" : "User found",
+                statusCode: 200,
+                data: { user: result.user, isNew: result.isNew },
+            });
+        } catch (error: unknown) {
+            const status = error instanceof Error && error.message.includes("already") ? 409 : 400;
+            res.status(status).json({
+                error: error instanceof Error ? error.message : "Unknown error",
+                statusCode: status,
+            });
+        }
+    }
+
+    async phoneLogin(req: Request, res: Response) {
+        try {
+            const { userId } = req.body;
+            if (!userId) {
+                res.status(400).json({ error: "userId is required", statusCode: 400 });
+                return;
+            }
+            const result = await UserServices.PhoneLogin(userId);
+            res.status(200).json({
+                message: "Login successful",
+                statusCode: 200,
+                data: result,
+            });
+        } catch (error: unknown) {
+            res.status(401).json({
+                error: error instanceof Error ? error.message : "Login failed",
+                statusCode: 401,
+            });
+        }
+    }
+
+    // ── Forgot / Reset Password ───────────────────────────────────────────
+
+    async forgotPassword(req: Request, res: Response) {
+        try {
+            const { identifier } = req.body;
+            if (!identifier) {
+                res.status(400).json({ error: "Email or phone is required", statusCode: 400 });
+                return;
+            }
+            const result = await UserServices.ForgotPassword(identifier);
+            res.status(200).json({
+                message: result.message,
+                statusCode: 200,
+                data: { userId: result.userId },
+            });
+        } catch (error: unknown) {
+            const status = error instanceof Error && error.message.includes("No account") ? 404 : 500;
+            res.status(status).json({
+                error: error instanceof Error ? error.message : "Unknown error",
+                statusCode: status,
+            });
+        }
+    }
+
+    async resetPassword(req: Request, res: Response) {
+        try {
+            const { userId, newPassword } = req.body;
+            if (!userId || !newPassword) {
+                res.status(400).json({ error: "userId and newPassword are required", statusCode: 400 });
+                return;
+            }
+            if (newPassword.length < 6) {
+                res.status(400).json({ error: "Password must be at least 6 characters", statusCode: 400 });
+                return;
+            }
+            const result = await UserServices.ResetPassword(userId, newPassword);
+            res.status(200).json({
+                message: result.message,
+                statusCode: 200,
+            });
+        } catch (error: unknown) {
+            const status = error instanceof Error && error.message.includes("not found") ? 404 : 400;
+            res.status(status).json({
+                error: error instanceof Error ? error.message : "Unknown error",
+                statusCode: status,
+            });
+        }
+    }
+
     async generateUsername(_req: Request, res: Response) {
         try {
             const username = await UserServices.GenerateRandomUsername();

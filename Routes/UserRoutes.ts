@@ -8,6 +8,10 @@ const router = express.Router();
 router.post("/register/phone", validateRegistration, UserControllers.registerWithPhone);
 router.post("/register/email", validateRegistration, UserControllers.registerWithEmail);
 router.post("/login", UserControllers.login);
+router.post("/find-or-create-by-phone", UserControllers.findOrCreateByPhone);
+router.post("/phone-login", UserControllers.phoneLogin);
+router.post("/forgot-password", UserControllers.forgotPassword);
+router.post("/reset-password", UserControllers.resetPassword);
 router.get("/generate-username", UserControllers.generateUsername);
 
 router.get("/", UserControllers.getAllUsers);

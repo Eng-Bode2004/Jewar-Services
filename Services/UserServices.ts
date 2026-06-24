@@ -243,6 +243,108 @@ class UserServices {
         return { user: safeUser, token, role: roleData, profile: profileData };
     }
 
+    // ── Phone Login (find or create via OTP) ───────────────────────────────
+
+    async FindOrCreateByPhone(phone: string) {
+        let user = await UserModel.findOne({ phone_number: phone });
+        if (user) {
+            const userObj = user.toObject();
+            const { password: _, ...safeUser } = userObj;
+            return { user: safeUser, isNew: false };
+        }
+
+        const username = await this.GenerateRandomUsername();
+        // Create user without password — OTP-based login
+        user = await UserModel.create({
+            username,
+            phone_number: phone,
+            password: "otp_only",  // placeholder, never used for OTP login
+            isActive: false,
+        });
+
+        const userObj = user.toObject();
+        const { password: _, ...safeUser } = userObj;
+        return { user: safeUser, isNew: true };
+    }
+
+    async PhoneLogin(userId: string) {
+        const user = await UserModel.findById(userId).select("+password");
+        if (!user) throw new Error("User not found");
+
+        user.isActive = true;
+        await user.save();
+
+        const JWT_SECRET = process.env.JWT_SECRET || "savora_jwt_secret_dev";
+        const token = jwt.sign(
+            { id: user._id, role: user.role },
+            JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        // Fetch role details if assigned
+        let roleData: Record<string, any> | null = null;
+        if (user.role) {
+            try {
+                const ROLE_SERVICE_URL = process.env.ROLE_SERVICE_URL || "https://savorarole-services-production.up.railway.app";
+                const res = await fetch(`${ROLE_SERVICE_URL}/api/v1/roles/${user.role}`);
+                if (res.ok) {
+                    const body: any = await res.json();
+                    roleData = body.data ?? null;
+                }
+            } catch (err) {
+                console.error("Failed to fetch role details:", err);
+            }
+        }
+
+        const userObj = user.toObject();
+        const { password: _, ...safeUser } = userObj;
+        return { user: safeUser, token, role: roleData };
+    }
+
+    // ── Forgot / Reset Password ────────────────────────────────────────────
+
+    async ForgotPassword(identifier: string) {
+        const user = await UserModel.findOne({
+            $or: [{ email: identifier }, { phone_number: identifier }],
+        });
+        if (!user) throw new Error("No account found with that email or phone");
+
+        const OTP_SERVICE_URL = process.env.OTP_SERVICE_URL || "https://savoraotp-services-production.up.railway.app";
+        const isEmail = identifier.includes("@");
+
+        try {
+            if (isEmail) {
+                await fetch(`${OTP_SERVICE_URL}/api/v1/otp/send/email`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: identifier, userID: user._id.toString() }),
+                });
+            } else {
+                await fetch(`${OTP_SERVICE_URL}/api/v1/otp/send/phone`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ phone: identifier, userID: user._id.toString() }),
+                });
+            }
+        } catch (err) {
+            console.error("Failed to send OTP:", err);
+            throw new Error("Failed to send verification code");
+        }
+
+        return { userId: user._id.toString(), message: "Verification code sent" };
+    }
+
+    async ResetPassword(userId: string, newPassword: string) {
+        const user = await UserModel.findById(userId).select("+password");
+        if (!user) throw new Error("User not found");
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        await user.save();
+
+        return { message: "Password reset successfully" };
+    }
+
     async GetUserLanguage(id: string) {
         const user = await UserModel.findById(id).select("language");
         if (!user) throw new Error("User not found");
