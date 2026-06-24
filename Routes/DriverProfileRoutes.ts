@@ -23,4 +23,6 @@ router.patch("/:id/rating", DriverProfileController.updateRating);
 router.patch("/:id/earnings", DriverProfileController.updateEarnings);
 router.patch("/:id/payment-method", DriverProfileController.setPaymentMethod);
 
+router.patch("/admin/settle-earnings/:id", DriverProfileController.settleEarnings);
+
 export default router;

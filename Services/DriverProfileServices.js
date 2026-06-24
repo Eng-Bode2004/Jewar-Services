@@ -186,6 +186,21 @@ class DriverProfileService {
          }
     }
 
+    async settleEarnings(profileId) {
+        try {
+            const driver = await DriverProfileModel.findById(profileId);
+            if (!driver) throw new Error("Driver not found");
+            if (!driver.earnings) driver.earnings = { total: 0, this_week: 0, pending: 0 };
+            
+            driver.earnings.total += driver.earnings.pending;
+            driver.earnings.pending = 0;
+            await driver.save();
+            return { status: "success", earnings: driver.earnings };
+        } catch (error) {
+            throw new Error(error.message || "Failed to settle driver earnings");
+        }
+    }
+
     async setPaymentMethod(profileId, bank_name, account_number, account_holder) {
         try {
             const updated = await DriverProfileModel.findByIdAndUpdate(profileId, {

@@ -146,6 +146,15 @@ class DriverProfileController {
         }
     }
 
+    async settleEarnings(req: any, res: any) {
+        try {
+            const result = await DriverProfileService.settleEarnings(req.params.id);
+            res.status(200).json(result);
+        } catch (error: any) {
+            res.status(400).json({ status: "error", message: error.message });
+        }
+    }
+
     async getAvailableDrivers(req: any, res: any) {
         try {
             const { lat, lng, radius } = req.query;
