@@ -289,6 +289,16 @@ class ChiefProfileController {
     }
   }
 
+  async settleChefEarnings(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.settleChefEarnings(req.params.id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      const e = error as Error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
+
   async getPendingPayments(req:Request, res:Response) {
     try {
       const result = await ChiefProfileServices.getPendingPayments();
@@ -346,10 +356,18 @@ class ChiefProfileController {
       const result = await ChiefProfileServices.acceptOrderDriver(req.params.id, driver_id);
       res.status(200).json(result);
     } catch (error:unknown) {
-      res.status(400).json({
-        status: "error",
-        message: error instanceof Error ? error.message : "Unknown error"
-      });
+      const e = error as Error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
+
+  async deliverOrderDriver(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.deliverOrderDriver(req.params.id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      const e = error as Error;
+      res.status(400).json({ status: "error", message: e.message });
     }
   }
 

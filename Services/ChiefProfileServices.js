@@ -1,5 +1,6 @@
 import ChiefProfileSchema from "../Models/ChiefProfileSchema.js";
 import OrderSchema from "../Models/OrderSchema.js";
+import DriverProfileSchema from "../../DriverProfile-Services/Models/DriverProfileModel.ts";
 import mongoose from "mongoose";
 
 const DailyDishAvailabilitySchema = new mongoose.Schema({
@@ -454,6 +455,22 @@ class ChiefProfileService {
     }
   }
 
+  async settleChefEarnings(chefId) {
+    try {
+      const chef = await ChiefProfileSchema.findById(chefId);
+      if (!chef) throw new Error("Chef not found");
+      if (!chef.earnings) chef.earnings = { total: 0, this_week: 0, pending: 0 };
+      
+      chef.earnings.total += chef.earnings.pending;
+      chef.earnings.pending = 0;
+      await chef.save();
+
+      return { status: "success", earnings: chef.earnings };
+    } catch (error) {
+      throw new Error(error.message || "Failed to settle chef earnings");
+    }
+  }
+
   async getPendingPayments() {
     try {
       const orders = await OrderSchema.find({ transaction_status: "pending" }).sort({ createdAt: -1 });
@@ -576,6 +593,42 @@ class ChiefProfileService {
       return { status: "success", orders };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch driver orders");
+    }
+  }
+
+  async deliverOrderDriver(orderId) {
+    try {
+      const order = await OrderSchema.findById(orderId);
+      if (!order) throw new Error("Order not found");
+      if (order.order_status === "completed") throw new Error("Order already completed");
+      
+      order.order_status = "completed";
+      await order.save();
+
+      // Update chef earnings
+      if (order.chef_id) {
+         const chef = await ChiefProfileSchema.findById(order.chef_id);
+         if (chef) {
+             if(!chef.earnings) chef.earnings = { total: 0, this_week: 0, pending: 0 };
+             const chefEarnings = order.total - 15; // 15 is driver fee
+             chef.earnings.pending += Math.max(0, chefEarnings);
+             await chef.save();
+         }
+      }
+
+      // Update driver earnings
+      if (order.driver_id) {
+         const driver = await DriverProfileSchema.findById(order.driver_id);
+         if (driver) {
+             if(!driver.earnings) driver.earnings = { total: 0, this_week: 0, pending: 0 };
+             driver.earnings.pending += 15;
+             await driver.save();
+         }
+      }
+
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to deliver order");
     }
   }
 
