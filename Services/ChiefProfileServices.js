@@ -564,9 +564,37 @@ class ChiefProfileService {
   
   async getAvailableOrdersForDriver() {
     try {
-      // Orders that are 'ready' but no driver is assigned
       const orders = await OrderSchema.find({ order_status: "ready", driver_id: { $exists: false } }).sort({ createdAt: -1 });
-      return { status: "success", orders };
+      const enriched = await Promise.all(orders.map(async (order) => {
+        const o = order.toObject();
+        // Enrich chef details
+        if (o.chef_id) {
+          const chef = await ChiefProfileSchema.findById(o.chef_id).select("name phone kitchen_address profile_image");
+          if (chef) {
+            o.chef_name = chef.name;
+            o.chef_phone = chef.phone;
+            o.chef_address = chef.kitchen_address || "";
+            o.chef_image = chef.profile_image || "";
+          }
+        }
+        // Enrich customer details
+        if (o.customer_id) {
+          try {
+            const custRes = await fetch(`${process.env.CUSTOMER_SERVICE_URL || "https://savoracustomerprofile-services-production.up.railway.app/api/v1/customer-profile"}/auth/${o.customer_id}`, {
+              headers: { "Content-Type": "application/json" }
+            });
+            if (custRes.ok) {
+              const custData = await custRes.json();
+              const cust = custData.profile || custData.response || custData;
+              o.customer_phone = cust.phone || "";
+              o.customer_email = cust.email || "";
+              o.customer_avatar = cust.avatar || "";
+            }
+          } catch (_) {}
+        }
+        return o;
+      }));
+      return { status: "success", orders: enriched };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch available orders for driver");
     }
