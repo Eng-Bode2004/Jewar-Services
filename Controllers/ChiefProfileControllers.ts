@@ -326,6 +326,45 @@ class ChiefProfileController {
     }
   }
 
+  // ── Driver Orders ────────────────────────────────────────────────────────
+
+  async getAvailableOrdersForDriver(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.getAvailableOrdersForDriver();
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(500).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async acceptOrderDriver(req:Request, res:Response) {
+    try {
+      const { driver_id } = req.body;
+      const result = await ChiefProfileServices.acceptOrderDriver(req.params.id, driver_id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async getDriverOrders(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.getDriverOrders(req.params.driverId);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(500).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
 }
 
 export default new ChiefProfileController();

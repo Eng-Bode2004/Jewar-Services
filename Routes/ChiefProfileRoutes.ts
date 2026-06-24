@@ -84,4 +84,15 @@ router.get("/order/chef/:chefId/earnings", ChiefProfileControllers.getChefEarnin
 // Admin: get all orders pending payment verification
 router.get("/admin/pending-payments", ChiefProfileControllers.getPendingPayments);
 
+// ── Driver Orders ────────────────────────────────────────────────────────
+
+// Driver: get available orders
+router.get("/order/available/driver", ChiefProfileControllers.getAvailableOrdersForDriver);
+
+// Driver: get my orders
+router.get("/order/driver/:driverId", ChiefProfileControllers.getDriverOrders);
+
+// Driver: accept an order
+router.patch("/order/:id/driver-accept", ChiefProfileControllers.acceptOrderDriver);
+
 export default router;

@@ -75,6 +75,12 @@ const ChiefProfileSchema = new mongoose.Schema({
     Payment_Method:{
         provider: { type: String },
         details: { type: String },
+    },
+
+    earnings: {
+        total: { type: Number, default: 0 },
+        this_week: { type: Number, default: 0 },
+        pending: { type: Number, default: 0 },
     }
 
 

@@ -544,6 +544,41 @@ class ChiefProfileService {
     }
   }
 
+  // ── Driver Orders ────────────────────────────────────────────────────────
+  
+  async getAvailableOrdersForDriver() {
+    try {
+      // Orders that are 'ready' but no driver is assigned
+      const orders = await OrderSchema.find({ order_status: "ready", driver_id: { $exists: false } }).sort({ createdAt: -1 });
+      return { status: "success", orders };
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch available orders for driver");
+    }
+  }
+
+  async acceptOrderDriver(orderId, driverId) {
+    try {
+      const order = await OrderSchema.findOneAndUpdate(
+        { _id: orderId, driver_id: { $exists: false }, order_status: "ready" },
+        { driver_id: driverId, order_status: "out_for_delivery" },
+        { new: true }
+      );
+      if (!order) throw new Error("Order not available or already accepted by another driver");
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to accept order for driver");
+    }
+  }
+
+  async getDriverOrders(driverId) {
+    try {
+      const orders = await OrderSchema.find({ driver_id: driverId }).sort({ createdAt: -1 });
+      return { status: "success", orders };
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch driver orders");
+    }
+  }
+
 }
 
 export default new ChiefProfileService();

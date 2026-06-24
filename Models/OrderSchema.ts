@@ -12,6 +12,7 @@ const OrderSchema = new mongoose.Schema({
   customer_id: { type: String, required: true, index: true },
   customer_name: { type: String },
   chef_id: { type: String, index: true },
+  driver_id: { type: String, index: true },
   items: { type: [OrderItemSchema], required: true },
   total: { type: Number, required: true },
   payment_method: { type: String },
@@ -23,7 +24,7 @@ const OrderSchema = new mongoose.Schema({
   },
   order_status: {
     type: String,
-    enum: ["pending", "accepted", "preparing", "ready", "completed", "cancelled"],
+    enum: ["pending", "accepted", "preparing", "ready", "out_for_delivery", "completed", "cancelled"],
     default: "pending",
   },
   delivery_address: {
