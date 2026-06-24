@@ -560,6 +560,24 @@ class ChiefProfileService {
     }
   }
 
+  // ── Admin Orders ─────────────────────────────────────────────────────────
+
+  async getAllOrders() {
+    try {
+      const orders = await OrderSchema.find({}).sort({ createdAt: -1 });
+      const total = orders.length;
+      const completed = orders.filter(o => o.order_status === "completed");
+      const totalRevenue = completed.reduce((sum, o) => sum + (o.total || 0), 0);
+      const statusCounts = {};
+      orders.forEach(o => {
+        statusCounts[o.order_status] = (statusCounts[o.order_status] || 0) + 1;
+      });
+      return { status: "success", orders, total, totalRevenue, statusCounts };
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch all orders");
+    }
+  }
+
   // ── Driver Orders ────────────────────────────────────────────────────────
   
   async getAvailableOrdersForDriver() {

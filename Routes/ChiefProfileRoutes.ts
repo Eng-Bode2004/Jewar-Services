@@ -43,6 +43,9 @@ router.patch("/:id/national-id", ChiefProfileControllers.uploadNationalId);
 // Submit completed verification for admin review
 router.patch("/:id/submit-verification", ChiefProfileControllers.submitForReview);
 
+// Admin: get all orders for analytics/dashboard
+router.get("/order/admin/all", ChiefProfileControllers.getAllOrders);
+
 // Admin: get all chiefs pending review
 router.get("/admin/pending-verifications", ChiefProfileControllers.getPendingVerifications);
 
