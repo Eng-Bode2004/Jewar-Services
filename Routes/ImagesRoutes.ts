@@ -47,6 +47,13 @@ router.post(
 );
 
 router.post(
+    "/role-image",
+    (req, _res, next) => { req.uploadFolder = "Savora/Admin/Roles"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
     "/dish-image",
     (req, _res, next) => { req.uploadFolder = "Savora/Dishes"; next(); },
     uploadDishImage.single("image"),
