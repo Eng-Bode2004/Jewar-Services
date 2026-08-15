@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import "./Config/DataBase.js";
 import cors from "cors";
+import multer from "multer";
 import ImagesRoutes from "./Routes/ImagesRoutes.ts";
 // Initialize Express
 const app = express();
@@ -20,8 +21,15 @@ app.use("/api/v2/images", ImagesRoutes);
 // Global error handler
 app.use((err: any, _req: any, res: any, _next: any) => {
     console.error("❌ Unhandled error:", err);
-    const status = err.status || 500;
-    const message = err.message || "Internal Server Error";
+    let status = err.status || 500;
+    let message = err.message || "Internal Server Error";
+    if (err instanceof multer.MulterError) {
+        status = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+        message =
+            err.code === "LIMIT_FILE_SIZE"
+                ? "File too large. Maximum size is 10MB."
+                : err.message;
+    }
     return res.status(status).json({ status: "error", message });
 });
 

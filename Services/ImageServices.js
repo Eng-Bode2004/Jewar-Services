@@ -1,5 +1,30 @@
+import crypto from "crypto";
 import cloudinary from "../Config/cloudinary.js";
 import ImagesSchema from "../Models/ImagesShema.js";
+
+async function uploadToCloudinary(buffer, folder, mimetype = "image/png", originalname = "image.png") {
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const toSign = `folder=${folder}&timestamp=${timestamp}`;
+    const signature = crypto.createHash("sha1").update(toSign + apiSecret).digest("hex");
+
+    const fd = new FormData();
+    fd.append("file", new Blob([buffer], { type: mimetype }), originalname);
+    fd.append("folder", folder);
+    fd.append("timestamp", timestamp);
+    fd.append("api_key", apiKey);
+    fd.append("signature", signature);
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: "POST",
+        body: fd,
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error?.message || "Cloudinary upload failed");
+    return json.secure_url || json.url;
+}
 
 class ImageServices {
     async uploadPhoto(data) {
@@ -10,18 +35,8 @@ class ImageServices {
             // CloudinaryStorage already uploaded — path is the URL
             url = path;
         } else if (buffer) {
-            // memoryStorage — upload to Cloudinary manually
-            const result = await new Promise((resolve, reject) => {
-                const stream = cloudinary.uploader.upload_stream(
-                    { folder, resource_type: "image" },
-                    (error, response) => {
-                        if (error) return reject(error);
-                        return resolve(response);
-                    }
-                );
-                stream.end(buffer);
-            });
-            url = result.secure_url || result.url;
+            // memoryStorage — upload to Cloudinary directly (avoids Bun stream bug)
+            url = await uploadToCloudinary(buffer, folder, mimetype, originalname);
         } else {
             throw new Error("No file data provided");
         }
