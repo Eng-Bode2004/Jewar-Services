@@ -1,4 +1,4 @@
-import ChiefProfileSchema from "../Models/ChiefProfileSchema.js";
+﻿import ShopOwnerProfileSchema from "../Models/ShopOwnerProfileSchema.js";
 import OrderSchema from "../Models/OrderSchema.js";
 import mongoose from "mongoose";
 
@@ -15,20 +15,20 @@ const DailyDishAvailability = mongoose.models.DailyDishAvailability ||
 
 class ChiefProfileService {
 
-    // 1️⃣ Create a new Chief Profile
+    // 1ï¸âƒ£ Create a new Chief Profile
     async createProfile(data) {
         try {
-            const profile = await ChiefProfileSchema.create(data);
+            const profile = await ShopOwnerProfileSchema.create(data);
             return { status: "success", profile };
         } catch (error) {
             throw new Error(error.message || "Failed to create Chief Profile");
         }
     }
 
-    // 2️⃣ Get a profile by ID
+    // 2ï¸âƒ£ Get a profile by ID
     async getProfileById(profileId) {
         try {
-            const profile = await ChiefProfileSchema.findById(profileId)
+            const profile = await ShopOwnerProfileSchema.findById(profileId)
             if (!profile) throw new Error("Profile not found");
             return { status: "success", profile };
         } catch (error) {
@@ -36,10 +36,10 @@ class ChiefProfileService {
         }
     }
 
-    // 3️⃣ Get all profiles with optional filters (enriched with address + preferred dishes)
+    // 3ï¸âƒ£ Get all profiles with optional filters (enriched with address + preferred dishes)
     async getAllProfiles(filter = {}) {
         try {
-            const profiles = await ChiefProfileSchema.find(filter)
+            const profiles = await ShopOwnerProfileSchema.find(filter)
             const enriched = await Promise.all(profiles.map(async (p) => {
                 const doc = p.toObject ? p.toObject() : { ...p };
                 const id = doc._id?.toString();
@@ -71,10 +71,10 @@ class ChiefProfileService {
         }
     }
 
-    // 4️⃣ Update profile by ID
+    // 4ï¸âƒ£ Update profile by ID
     async updateProfile(profileId, updateData) {
         try {
-            const updatedProfile = await ChiefProfileSchema.findByIdAndUpdate(
+            const updatedProfile = await ShopOwnerProfileSchema.findByIdAndUpdate(
                 profileId,
                 updateData,
                 { new: true }
@@ -86,10 +86,10 @@ class ChiefProfileService {
         }
     }
 
-    // 5️⃣ Delete profile by ID
+    // 5ï¸âƒ£ Delete profile by ID
     async deleteProfile(profileId) {
         try {
-            const deleted = await ChiefProfileSchema.findByIdAndDelete(profileId);
+            const deleted = await ShopOwnerProfileSchema.findByIdAndDelete(profileId);
             if (!deleted) throw new Error("Profile not found");
             return { status: "success", message: "Profile deleted successfully" };
         } catch (error) {
@@ -97,10 +97,10 @@ class ChiefProfileService {
         }
     }
 
-    // 6️⃣ Verify profile (set Is_Verified = true)
+    // 6ï¸âƒ£ Verify profile (set Is_Verified = true)
     async verifyProfile(profileId) {
         try {
-            const verifiedProfile = await ChiefProfileSchema.findByIdAndUpdate(
+            const verifiedProfile = await ShopOwnerProfileSchema.findByIdAndUpdate(
                 profileId,
                 { Is_Verified: true },
                 { new: true }
@@ -112,14 +112,14 @@ class ChiefProfileService {
         }
     }
 
-    // 7️⃣ Verify a specific step by field name
+    // 7ï¸âƒ£ Verify a specific step by field name
     async verifyStep(profileId, step, status) {
         try {
             const validSteps = [
-                "Items_Can_Make_Status",
+                "Products_Status",
                 "Address_Status",
                 "Payment_Method_Status",
-                "Health_Certificate_Status",
+                "Commercial_Register_Status",
                 "National_ID_Status",
             ];
             if (!validSteps.includes(step)) {
@@ -129,7 +129,7 @@ class ChiefProfileService {
             if (!validStatuses.includes(status)) {
                 throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(", ")}`);
             }
-            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
                 profileId,
                 { [step]: status },
                 { new: true }
@@ -141,11 +141,11 @@ class ChiefProfileService {
         }
     }
 
-    // 8️⃣ Get verification steps status
+    // 8ï¸âƒ£ Get verification steps status
     async getVerificationSteps(profileId) {
         try {
-            const profile = await ChiefProfileSchema.findById(profileId).select(
-                "Items_Can_Make_Status Address_Status Payment_Method_Status Health_Certificate_Status National_ID_Status Is_Verified"
+            const profile = await ShopOwnerProfileSchema.findById(profileId).select(
+                "Products_Status Address_Status Payment_Method_Status Commercial_Register_Status National_ID_Status Is_Verified"
             );
             if (!profile) throw new Error("Profile not found");
             return { status: "success", steps: profile };
@@ -154,14 +154,14 @@ class ChiefProfileService {
         }
     }
 
-    // 9️⃣ Upload health certificate (store URL)
-    async uploadHealthCertificate(profileId, certificateUrl) {
+    // 9ï¸âƒ£ Upload health certificate (store URL)
+    async uploadCommercialRegister(profileId, certificateUrl) {
         try {
-            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
                 profileId,
                 {
-                    Health_Certificate: certificateUrl,
-                    Health_Certificate_Status: "in_progress",
+                    Commercial_Register: certificateUrl,
+                    Commercial_Register_Status: "in_progress",
                 },
                 { new: true }
             );
@@ -172,10 +172,10 @@ class ChiefProfileService {
         }
     }
 
-    // 🔟 Upload payment method
+    // ðŸ”Ÿ Upload payment method
     async uploadPaymentMethod(profileId, { provider, details }) {
         try {
-            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
                 profileId,
                 {
                     Payment_Method: { provider, details },
@@ -189,10 +189,10 @@ class ChiefProfileService {
         }
     }
 
-    // 1️⃣1️⃣ Upload national ID images
+    // 1ï¸âƒ£1ï¸âƒ£ Upload national ID images
     async uploadNationalId(profileId, frontImageURL, backImageURL) {
         try {
-            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
                 profileId,
                 {
                     National_ID_Front: frontImageURL,
@@ -207,25 +207,25 @@ class ChiefProfileService {
         }
     }
 
-    // 1️⃣2️⃣ Submit for admin review (chef calls this after all steps verified)
+    // 1ï¸âƒ£2ï¸âƒ£ Submit for admin review (chef calls this after all steps verified)
     async submitForReview(profileId) {
         try {
-            const profile = await ChiefProfileSchema.findById(profileId);
+            const profile = await ShopOwnerProfileSchema.findById(profileId);
             if (!profile) throw new Error("Profile not found");
 
             const steps = [
-                "Health_Certificate_Status",
+                "Commercial_Register_Status",
                 "Address_Status",
                 "National_ID_Status",
                 "Payment_Method_Status",
-                "Items_Can_Make_Status",
+                "Products_Status",
             ];
             const pending = steps.filter(s => profile[s] !== "verified");
             if (pending.length > 0) {
                 throw new Error(`Cannot submit: incomplete steps: ${pending.join(", ")}`);
             }
 
-            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
                 profileId,
                 { Verification_Status: "pending_review" },
                 { new: true }
@@ -236,10 +236,10 @@ class ChiefProfileService {
         }
     }
 
-    // 1️⃣3️⃣ Get all chiefs pending admin review (includes address + preferred dishes)
+    // 1ï¸âƒ£3ï¸âƒ£ Get all chiefs pending admin review (includes address + preferred dishes)
     async getPendingVerifications() {
         try {
-            const profiles = await ChiefProfileSchema.find({
+            const profiles = await ShopOwnerProfileSchema.find({
                 Verification_Status: "pending_review",
             });
             // enrich each profile with address and preferred dishes
@@ -278,10 +278,10 @@ class ChiefProfileService {
         }
     }
 
-    // 1️⃣4️⃣ Approve verification (admin action)
+    // 1ï¸âƒ£4ï¸âƒ£ Approve verification (admin action)
     async approveVerification(profileId) {
         try {
-            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
                 profileId,
                 {
                     Verification_Status: "approved",
@@ -296,14 +296,14 @@ class ChiefProfileService {
         }
     }
 
-    // 1️⃣5️⃣ Reject verification (admin action)
+    // 1ï¸âƒ£5ï¸âƒ£ Reject verification (admin action)
     async rejectVerification(profileId, rejectionReason) {
         try {
             const updateFields = { Verification_Status: "rejected" };
             if (rejectionReason) {
                 updateFields.Rejection_Reason = rejectionReason;
             }
-            const updated = await ChiefProfileSchema.findByIdAndUpdate(
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
                 profileId,
                 updateFields,
                 { new: true }
@@ -315,9 +315,9 @@ class ChiefProfileService {
         }
     }
 
-  // ═══════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // ORDER MANAGEMENT
-  // ═══════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   async createOrder(data) {
     try {
@@ -384,7 +384,7 @@ class ChiefProfileService {
 
         // Filter out chefs whose kitchen is closed
         const chefIds = [...chefMap.keys()];
-        const openChefs = await ChiefProfileSchema.find({ _id: { $in: chefIds }, kitchen_open: { $ne: false } }).select("_id");
+        const openChefs = await ShopOwnerProfileSchema.find({ _id: { $in: chefIds }, shop_open: { $ne: false } }).select("_id");
         const openIds = new Set(openChefs.map(c => c._id.toString()));
         for (const cid of chefIds) {
           if (!openIds.has(cid)) chefMap.delete(cid);
@@ -456,7 +456,7 @@ class ChiefProfileService {
 
   async settleChefEarnings(chefId) {
     try {
-      const chef = await ChiefProfileSchema.findById(chefId);
+      const chef = await ShopOwnerProfileSchema.findById(chefId);
       if (!chef) throw new Error("Chef not found");
       if (!chef.earnings) chef.earnings = { total: 0, this_week: 0, pending: 0 };
       
@@ -546,21 +546,21 @@ class ChiefProfileService {
     }
   }
 
-  async setKitchenStatus(profileId, kitchenOpen) {
+  async setShopStatus(profileId, shopOpen) {
     try {
-      const updated = await ChiefProfileSchema.findByIdAndUpdate(
+      const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
         profileId,
-        { kitchen_open: kitchenOpen },
+        { shop_open: shopOpen },
         { new: true }
       );
       if (!updated) throw new Error("Profile not found");
-      return { status: "success", kitchen_open: updated.kitchen_open };
+      return { status: "success", shop_open: updated.shop_open };
     } catch (error) {
       throw new Error(error.message || "Failed to update kitchen status");
     }
   }
 
-  // ── Admin Orders ─────────────────────────────────────────────────────────
+  // â”€â”€ Admin Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getAllOrders() {
     try {
@@ -578,7 +578,7 @@ class ChiefProfileService {
     }
   }
 
-  // ── Driver Orders ────────────────────────────────────────────────────────
+  // â”€â”€ Driver Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   
   async getAvailableOrdersForDriver() {
     try {
@@ -587,11 +587,11 @@ class ChiefProfileService {
         const o = order.toObject();
         // Enrich chef details
         if (o.chef_id) {
-          const chef = await ChiefProfileSchema.findById(o.chef_id).select("name phone kitchen_address profile_image");
+          const chef = await ShopOwnerProfileSchema.findById(o.chef_id).select("name phone shop_address profile_image");
           if (chef) {
             o.chef_name = chef.name;
             o.chef_phone = chef.phone;
-            o.chef_address = chef.kitchen_address || "";
+            o.chef_address = chef.shop_address || "";
             o.chef_image = chef.profile_image || "";
           }
         }
@@ -652,7 +652,7 @@ class ChiefProfileService {
 
       // Update chef earnings
       if (order.chef_id) {
-         const chef = await ChiefProfileSchema.findById(order.chef_id);
+         const chef = await ShopOwnerProfileSchema.findById(order.chef_id);
          if (chef) {
              if(!chef.earnings) chef.earnings = { total: 0, this_week: 0, pending: 0 };
              const chefEarnings = order.total - 15; // 15 is driver fee
@@ -711,3 +711,4 @@ class ChiefProfileService {
 }
 
 export default new ChiefProfileService();
+

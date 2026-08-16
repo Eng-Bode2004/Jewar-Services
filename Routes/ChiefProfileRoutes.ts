@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import ShopOwnerProfileControllers from "../Controllers/ChiefProfileControllers.ts";
 
 const router = express.Router();
@@ -32,7 +32,7 @@ router.get("/:id/verification-steps", ShopOwnerProfileControllers.getVerificatio
 router.patch("/:id/verify-step", ShopOwnerProfileControllers.verifyStep);
 
 // Upload health certificate URL
-router.patch("/:id/health-certificate", ShopOwnerProfileControllers.uploadHealthCertificate);
+router.patch("/:id/commercial-register", ShopOwnerProfileControllers.uploadCommercialRegister);
 
 // Upload payment method
 router.patch("/:id/payment-method", ShopOwnerProfileControllers.uploadPaymentMethod);
@@ -56,9 +56,9 @@ router.patch("/:id/approve-verification", ShopOwnerProfileControllers.approveVer
 router.patch("/:id/reject-verification", ShopOwnerProfileControllers.rejectVerification);
 
 // Chef: toggle kitchen open/closed
-router.patch("/:id/kitchen-status", ShopOwnerProfileControllers.setKitchenStatus);
+router.patch("/:id/shop-status", ShopOwnerProfileControllers.setShopStatus);
 
-// ── Order Management ─────────────────────────────────────────────────────
+// â”€â”€ Order Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Create a new order (customer checkout)
 router.post("/order", ShopOwnerProfileControllers.createOrder);
@@ -90,7 +90,7 @@ router.get("/admin/pending-payments", ShopOwnerProfileControllers.getPendingPaym
 // Admin: settle chief earnings
 router.patch("/admin/settle-earnings/chef/:id", ShopOwnerProfileControllers.settleChefEarnings);
 
-// ── Driver Orders ────────────────────────────────────────────────────────
+// â”€â”€ Driver Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Driver: get available orders
 router.get("/order/available/driver", ShopOwnerProfileControllers.getAvailableOrdersForDriver);
@@ -108,3 +108,4 @@ router.patch("/order/:id/driver-deliver", ShopOwnerProfileControllers.deliverOrd
 router.post("/order/:id/rate", ShopOwnerProfileControllers.rateOrder);
 
 export default router;
+

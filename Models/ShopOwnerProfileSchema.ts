@@ -6,7 +6,7 @@ const stepStatus = {
     default: "pending",
 };
 
-const ChiefProfileSchema = new mongoose.Schema({
+const ShopOwnerProfileSchema = new mongoose.Schema({
 
     auth_id: {
         type: String,
@@ -43,17 +43,17 @@ const ChiefProfileSchema = new mongoose.Schema({
         type: String,
     },
 
-    Health_Certificate: {
+    Commercial_Register: {
         type: String,
     },
 
-    Items_Can_Make_Status: stepStatus,
+    Products_Status: stepStatus,
 
     Address_Status: stepStatus,
 
     Payment_Method_Status: stepStatus,
 
-    Health_Certificate_Status: stepStatus,
+    Commercial_Register_Status: stepStatus,
 
     National_ID_Status: stepStatus,
 
@@ -67,12 +67,12 @@ const ChiefProfileSchema = new mongoose.Schema({
         type: String,
     },
 
-    kitchen_open: {
+    shop_open: {
         type: Boolean,
         default: true,
     },
 
-    kitchen_address: {
+    shop_address: {
         type: String,
     },
 
@@ -90,4 +90,4 @@ const ChiefProfileSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-export default mongoose.model("ShopOwner Profile", ChiefProfileSchema);
+export default mongoose.model("ShopOwner Profile", ShopOwnerProfileSchema);

@@ -1,4 +1,4 @@
-import type {Request,Response} from "express";
+﻿import type {Request,Response} from "express";
 import ChiefProfileServices from "../Services/ChiefProfileServices";
 
 class ChiefProfileController {
@@ -101,14 +101,14 @@ class ChiefProfileController {
         }
     }
 
-    async uploadHealthCertificate(req:Request, res:Response) {
+    async uploadCommercialRegister(req:Request, res:Response) {
         try {
             const { certificateUrl } = req.body;
             if (!certificateUrl) {
                 res.status(400).json({ status: "error", message: "certificateUrl is required" });
                 return;
             }
-            const result = await ChiefProfileServices.uploadHealthCertificate(req.params.id as string, certificateUrl);
+            const result = await ChiefProfileServices.uploadCommercialRegister(req.params.id as string, certificateUrl);
             res.status(200).json(result);
         } catch (error:unknown) {
             res.status(500).json({
@@ -201,7 +201,7 @@ class ChiefProfileController {
         }
     }
 
-  // ── Orders ─────────────────────────────────────────────────────────────
+  // â”€â”€ Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async createOrder(req:Request, res:Response) {
     try {
@@ -323,10 +323,10 @@ class ChiefProfileController {
     }
   }
 
-  async setKitchenStatus(req:Request, res:Response) {
+  async setShopStatus(req:Request, res:Response) {
     try {
-      const { kitchen_open } = req.body;
-      const result = await ChiefProfileServices.setKitchenStatus(req.params.id, kitchen_open);
+      const { shop_open } = req.body;
+      const result = await ChiefProfileServices.setShopStatus(req.params.id, shop_open);
       res.status(200).json(result);
     } catch (error:unknown) {
       res.status(400).json({
@@ -336,7 +336,7 @@ class ChiefProfileController {
     }
   }
 
-  // ── Driver Orders ────────────────────────────────────────────────────────
+  // â”€â”€ Driver Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getAvailableOrdersForDriver(req:Request, res:Response) {
     try {
@@ -411,3 +411,4 @@ class ChiefProfileController {
 }
 
 export default new ChiefProfileController();
+
