@@ -90,4 +90,4 @@ const ChiefProfileSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-export default mongoose.model("Chief Profile", ChiefProfileSchema);
+export default mongoose.model("ShopOwner Profile", ChiefProfileSchema);
