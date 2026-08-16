@@ -1,4 +1,4 @@
-import Profile from "../Models/profile_Schema.ts";
+﻿import Profile from "../Models/profile_Schema.ts";
 import crypto from "crypto";
 
 class CustomerProfileServices {
@@ -9,7 +9,7 @@ class CustomerProfileServices {
   }
 
   async editProfile(id, data) {
-    const allowed = ["name", "email", "phone", "address", "avatar", "Is_Verified", "payment_method", "Is_Payment_Method_Verified", "Is_Address_Verified", "IS_Favorite_Items_Verified", "preferred_dishes"];
+    const allowed = ["name", "email", "phone", "address", "avatar", "Is_Verified", "payment_method", "Is_Payment_Method_Verified", "Is_Address_Verified", "IS_Favorite_Items_Verified", "favorite_items"];
     const updates = {};
     for (const key of allowed) {
       if (data[key] !== undefined) updates[key] = data[key];
@@ -125,3 +125,4 @@ class CustomerProfileServices {
 }
 
 export default new CustomerProfileServices();
+

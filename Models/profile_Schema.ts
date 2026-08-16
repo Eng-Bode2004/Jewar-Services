@@ -69,9 +69,9 @@ const CustomerProfileSchema = new mongoose.Schema(
       default: false,
     },
 
-    preferred_dishes: [{
+    favorite_items: [{
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Dish",
+      ref: "Product",
     }],
 
   },
