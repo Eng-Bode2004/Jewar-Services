@@ -1,5 +1,5 @@
 import express from "express";
-import ChiefProfileControllers from "../Controllers/ChiefProfileControllers.ts";
+import ShopOwnerProfileControllers from "../Controllers/ChiefProfileControllers.ts";
 
 const router = express.Router();
 
@@ -8,103 +8,103 @@ const router = express.Router();
 // -----------------------------
 
 // Create a new Chief Profile (protected, admin only)
-router.post("/", ChiefProfileControllers.create);
+router.post("/", ShopOwnerProfileControllers.create);
 
 // Get all profiles (protected, maybe only Admin or Manager)
-router.get("/", ChiefProfileControllers.getAll);
+router.get("/", ShopOwnerProfileControllers.getAll);
 
 // Get profile by ID (protected, anyone logged in can view)
-router.get("/:id", ChiefProfileControllers.getById);
+router.get("/:id", ShopOwnerProfileControllers.getById);
 
 // Update profile by ID (protected, only Admin)
-router.put("/:id", ChiefProfileControllers.update);
+router.put("/:id", ShopOwnerProfileControllers.update);
 
 // Delete profile by ID (protected, only Admin)
-router.delete("/:id", ChiefProfileControllers.delete);
+router.delete("/:id", ShopOwnerProfileControllers.delete);
 
 // Verify a profile (protected, only Admin)
-router.patch("/:id/verify", ChiefProfileControllers.verify);
+router.patch("/:id/verify", ShopOwnerProfileControllers.verify);
 
 // Get all verification steps status
-router.get("/:id/verification-steps", ChiefProfileControllers.getVerificationSteps);
+router.get("/:id/verification-steps", ShopOwnerProfileControllers.getVerificationSteps);
 
 // Verify a specific step status
-router.patch("/:id/verify-step", ChiefProfileControllers.verifyStep);
+router.patch("/:id/verify-step", ShopOwnerProfileControllers.verifyStep);
 
 // Upload health certificate URL
-router.patch("/:id/health-certificate", ChiefProfileControllers.uploadHealthCertificate);
+router.patch("/:id/health-certificate", ShopOwnerProfileControllers.uploadHealthCertificate);
 
 // Upload payment method
-router.patch("/:id/payment-method", ChiefProfileControllers.uploadPaymentMethod);
+router.patch("/:id/payment-method", ShopOwnerProfileControllers.uploadPaymentMethod);
 
 // Upload national ID images
-router.patch("/:id/national-id", ChiefProfileControllers.uploadNationalId);
+router.patch("/:id/national-id", ShopOwnerProfileControllers.uploadNationalId);
 
 // Submit completed verification for admin review
-router.patch("/:id/submit-verification", ChiefProfileControllers.submitForReview);
+router.patch("/:id/submit-verification", ShopOwnerProfileControllers.submitForReview);
 
 // Admin: get all orders for analytics/dashboard
-router.get("/order/admin/all", ChiefProfileControllers.getAllOrders);
+router.get("/order/admin/all", ShopOwnerProfileControllers.getAllOrders);
 
 // Admin: get all chiefs pending review
-router.get("/admin/pending-verifications", ChiefProfileControllers.getPendingVerifications);
+router.get("/admin/pending-verifications", ShopOwnerProfileControllers.getPendingVerifications);
 
 // Admin: approve a chief's verification
-router.patch("/:id/approve-verification", ChiefProfileControllers.approveVerification);
+router.patch("/:id/approve-verification", ShopOwnerProfileControllers.approveVerification);
 
 // Admin: reject a chief's verification
-router.patch("/:id/reject-verification", ChiefProfileControllers.rejectVerification);
+router.patch("/:id/reject-verification", ShopOwnerProfileControllers.rejectVerification);
 
 // Chef: toggle kitchen open/closed
-router.patch("/:id/kitchen-status", ChiefProfileControllers.setKitchenStatus);
+router.patch("/:id/kitchen-status", ShopOwnerProfileControllers.setKitchenStatus);
 
 // ── Order Management ─────────────────────────────────────────────────────
 
 // Create a new order (customer checkout)
-router.post("/order", ChiefProfileControllers.createOrder);
+router.post("/order", ShopOwnerProfileControllers.createOrder);
 
 // Get all orders for a chef
-router.get("/order/chef/:chefId", ChiefProfileControllers.getChefOrders);
+router.get("/order/chef/:chefId", ShopOwnerProfileControllers.getChefOrders);
 
 // Get all orders for a customer
-router.get("/order/customer/:customerId", ChiefProfileControllers.getCustomerOrders);
+router.get("/order/customer/:customerId", ShopOwnerProfileControllers.getCustomerOrders);
 
 // Get a single order by ID
-router.get("/order/:id", ChiefProfileControllers.getOrderById);
+router.get("/order/:id", ShopOwnerProfileControllers.getOrderById);
 
 // Admin: verify/reject payment for an order
-router.patch("/order/:id/payment-verify", ChiefProfileControllers.verifyPayment);
+router.patch("/order/:id/payment-verify", ShopOwnerProfileControllers.verifyPayment);
 
 // Chef: accept an order
-router.patch("/order/:id/accept", ChiefProfileControllers.acceptOrder);
+router.patch("/order/:id/accept", ShopOwnerProfileControllers.acceptOrder);
 
 // Chef: update order status (preparing / ready / completed / cancelled)
-router.patch("/order/:id/status", ChiefProfileControllers.updateOrderStatus);
+router.patch("/order/:id/status", ShopOwnerProfileControllers.updateOrderStatus);
 
 // Chef: get earnings summary (completed orders, 10% fee)
-router.get("/order/chef/:chefId/earnings", ChiefProfileControllers.getChefEarnings);
+router.get("/order/chef/:chefId/earnings", ShopOwnerProfileControllers.getChefEarnings);
 
 // Admin: get all orders pending payment verification
-router.get("/admin/pending-payments", ChiefProfileControllers.getPendingPayments);
+router.get("/admin/pending-payments", ShopOwnerProfileControllers.getPendingPayments);
 
 // Admin: settle chief earnings
-router.patch("/admin/settle-earnings/chef/:id", ChiefProfileControllers.settleChefEarnings);
+router.patch("/admin/settle-earnings/chef/:id", ShopOwnerProfileControllers.settleChefEarnings);
 
 // ── Driver Orders ────────────────────────────────────────────────────────
 
 // Driver: get available orders
-router.get("/order/available/driver", ChiefProfileControllers.getAvailableOrdersForDriver);
+router.get("/order/available/driver", ShopOwnerProfileControllers.getAvailableOrdersForDriver);
 
 // Driver: get my orders
-router.get("/order/driver/:driverId", ChiefProfileControllers.getDriverOrders);
+router.get("/order/driver/:driverId", ShopOwnerProfileControllers.getDriverOrders);
 
 // Driver: accept an order
-router.patch("/order/:id/driver-accept", ChiefProfileControllers.acceptOrderDriver);
+router.patch("/order/:id/driver-accept", ShopOwnerProfileControllers.acceptOrderDriver);
 
 // Driver: deliver an order
-router.patch("/order/:id/driver-deliver", ChiefProfileControllers.deliverOrderDriver);
+router.patch("/order/:id/driver-deliver", ShopOwnerProfileControllers.deliverOrderDriver);
 
 // Customer: rate order and driver after completion
-router.post("/order/:id/rate", ChiefProfileControllers.rateOrder);
+router.post("/order/:id/rate", ShopOwnerProfileControllers.rateOrder);
 
 export default router;

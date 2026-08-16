@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use("/api/v2/chief-profile", ChiefProfileRoutes);
+app.use("/api/v2/shop-owner-profile", ChiefProfileRoutes);
 
 // Start Server
 const PORT = process.env.PORT;
