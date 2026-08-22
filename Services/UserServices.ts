@@ -1,4 +1,4 @@
-import UserModel from "../Models/UserSchema.ts";
+﻿import UserModel from "../Models/UserSchema.ts";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -211,7 +211,7 @@ class UserServices {
         let roleData: Record<string, any> | null = null;
         if (user.role) {
             try {
-                const ROLE_SERVICE_URL = process.env.ROLE_SERVICE_URL || "https://savorarole-services-production.up.railway.app";
+                const ROLE_SERVICE_URL = process.env.ROLE_SERVICE_URL || "https://jewarrole-services-production.up.railway.app";
                 const res = await fetch(`${ROLE_SERVICE_URL}/api/v1/roles/${user.role}`);
                 if (res.ok) {
                     const body: any = await res.json();
@@ -243,7 +243,7 @@ class UserServices {
         return { user: safeUser, token, role: roleData, profile: profileData };
     }
 
-    // ── Phone Login (find or create via OTP) ───────────────────────────────
+    // â”€â”€ Phone Login (find or create via OTP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async FindOrCreateByPhone(phone: string) {
         let user = await UserModel.findOne({ phone_number: phone });
@@ -254,7 +254,7 @@ class UserServices {
         }
 
         const username = await this.GenerateRandomUsername();
-        // Create user without password — OTP-based login
+        // Create user without password â€” OTP-based login
         user = await UserModel.create({
             username,
             phone_number: phone,
@@ -285,7 +285,7 @@ class UserServices {
         let roleData: Record<string, any> | null = null;
         if (user.role) {
             try {
-                const ROLE_SERVICE_URL = process.env.ROLE_SERVICE_URL || "https://savorarole-services-production.up.railway.app";
+                const ROLE_SERVICE_URL = process.env.ROLE_SERVICE_URL || "https://jewarrole-services-production.up.railway.app";
                 const res = await fetch(`${ROLE_SERVICE_URL}/api/v1/roles/${user.role}`);
                 if (res.ok) {
                     const body: any = await res.json();
@@ -301,7 +301,7 @@ class UserServices {
         return { user: safeUser, token, role: roleData };
     }
 
-    // ── Forgot / Reset Password ────────────────────────────────────────────
+    // â”€â”€ Forgot / Reset Password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async ForgotPassword(identifier: string) {
         const user = await UserModel.findOne({
