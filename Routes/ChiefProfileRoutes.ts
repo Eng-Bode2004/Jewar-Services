@@ -69,6 +69,9 @@ router.patch("/:id/approve-verification", ShopOwnerProfileControllers.approveVer
 // Admin: reject a chief's verification
 router.patch("/:id/reject-verification", ShopOwnerProfileControllers.rejectVerification);
 
+// Admin: reject specific verification steps (wrong details → owner resends)
+router.patch("/:id/reject-steps", ShopOwnerProfileControllers.rejectSteps);
+
 // Chef: toggle kitchen open/closed
 router.patch("/:id/shop-status", ShopOwnerProfileControllers.setShopStatus);
 

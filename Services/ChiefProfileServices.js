@@ -393,7 +393,7 @@ class ChiefProfileService {
             if (rejectionReason) {
                 updateFields.Rejection_Reason = rejectionReason;
             }
-            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
+        const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
                 profileId,
                 updateFields,
                 { new: true }
@@ -405,7 +405,43 @@ class ChiefProfileService {
         }
     }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // Reject specific verification steps (admin marks wrong details so the
+    // shop owner has to resend them)
+    async rejectSteps(profileId, steps, reason) {
+        try {
+            const validSteps = [
+                "Products_Status",
+                "Address_Status",
+                "Payment_Method_Status",
+                "Commercial_Register_Status",
+                "National_ID_Status",
+                "Shop_Info_Status",
+                "Tax_Record_Status",
+                "Tax_Card_Status",
+            ];
+            if (!Array.isArray(steps) || steps.length === 0) {
+                throw new Error("steps array is required");
+            }
+            const invalid = steps.filter((s) => !validSteps.includes(s));
+            if (invalid.length > 0) {
+                throw new Error(`Invalid steps: ${invalid.join(", ")}`);
+            }
+            const update = { Verification_Status: "rejected" };
+            steps.forEach((s) => { update[s] = "rejected"; });
+            if (reason) update.Rejection_Reason = reason;
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
+                profileId,
+                update,
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to reject steps");
+        }
+    }
+
+  // â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�â•�
   // ORDER MANAGEMENT
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 

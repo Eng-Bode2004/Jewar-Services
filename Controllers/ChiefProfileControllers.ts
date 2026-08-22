@@ -271,6 +271,20 @@ class ChiefProfileController {
         }
     }
 
+    async rejectSteps(req:Request, res:Response) {
+        try {
+            const { steps, reason } = req.body;
+            const result = await ChiefProfileServices.rejectSteps(req.params.id as string, steps, reason);
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
+
   // â”€â”€ Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async createOrder(req:Request, res:Response) {
