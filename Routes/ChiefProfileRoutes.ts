@@ -40,6 +40,20 @@ router.patch("/:id/payment-method", ShopOwnerProfileControllers.uploadPaymentMet
 // Upload national ID images
 router.patch("/:id/national-id", ShopOwnerProfileControllers.uploadNationalId);
 
+// ── Jewar shop onboarding steps ──
+
+// Shop info step: shop name + cover image (+ category type)
+router.patch("/:id/shop-info", ShopOwnerProfileControllers.updateShopInfo);
+
+// Address step: shop address
+router.patch("/:id/shop-address", ShopOwnerProfileControllers.updateShopAddress);
+
+// Tax record image step
+router.patch("/:id/tax-record", ShopOwnerProfileControllers.uploadTaxRecord);
+
+// Tax card image step
+router.patch("/:id/tax-card", ShopOwnerProfileControllers.uploadTaxCard);
+
 // Submit completed verification for admin review
 router.patch("/:id/submit-verification", ShopOwnerProfileControllers.submitForReview);
 

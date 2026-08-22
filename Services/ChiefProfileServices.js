@@ -13,6 +13,21 @@ DailyDishAvailabilitySchema.index({ chief_id: 1, dish_id: 1, date: 1 }, { unique
 const DailyDishAvailability = mongoose.models.DailyDishAvailability ||
     mongoose.model("DailyDishAvailability", DailyDishAvailabilitySchema);
 
+// ── Cross-service URLs (env-overridable, defaults point at production) ──
+const ADDRESS_SERVICE_URL = process.env.ADDRESS_SERVICE_URL || "https://jewaraddress-services-production.up.railway.app/api/v1/address";
+const PREFERRED_DISHES_SERVICE_URL = process.env.PREFERRED_DISHES_SERVICE_URL || "https://jewardishprefered-services-production.up.railway.app/api/v1/preferred-dishes-chief";
+const CUSTOMER_SERVICE_URL = process.env.CUSTOMER_SERVICE_URL || "https://jewarcustomerprofile-services-production.up.railway.app/api/v1/customer-profile";
+const DRIVER_SERVICE_URL = process.env.DRIVER_SERVICE_URL || "https://jewardriverprofile-services-production.up.railway.app/api/v2/driver-profile";
+
+// Steps that must be verified before a shop can submit for review
+const REQUIRED_VERIFICATION_STEPS = [
+    "Address_Status",
+    "Shop_Info_Status",
+    "National_ID_Status",
+    "Tax_Record_Status",
+    "Tax_Card_Status",
+];
+
 class ChiefProfileService {
 
     // 1ï¸âƒ£ Create a new Chief Profile
@@ -46,7 +61,7 @@ class ChiefProfileService {
                 if (!id) return doc;
                 // fetch address
                 try {
-                    const addrRes = await fetch(`https://savoraaddress-services-production.up.railway.app/api/v1/address/?Profile_id=${id}`);
+                    const addrRes = await fetch(`${ADDRESS_SERVICE_URL}/?Profile_id=${id}`);
                     if (addrRes.ok) {
                         const addrData = await addrRes.json();
                         const addrs = addrData?.addresses ?? [];
@@ -55,7 +70,7 @@ class ChiefProfileService {
                 } catch { /* address unavailable */ }
                 // fetch preferred dishes
                 try {
-                    const prefRes = await fetch(`https://savoradishprefered-services-production.up.railway.app/api/v1/preferred-dishes-chief/preferred/${id}`);
+                    const prefRes = await fetch(`${PREFERRED_DISHES_SERVICE_URL}/preferred/${id}`);
                     if (prefRes.ok) {
                         const prefData = await prefRes.json();
                         doc.preferredDishes = prefData?.preferred ?? [];
@@ -115,12 +130,15 @@ class ChiefProfileService {
     // 7ï¸âƒ£ Verify a specific step by field name
     async verifyStep(profileId, step, status) {
         try {
-            const validSteps = [
+        const validSteps = [
                 "Products_Status",
                 "Address_Status",
                 "Payment_Method_Status",
                 "Commercial_Register_Status",
                 "National_ID_Status",
+                "Shop_Info_Status",
+                "Tax_Record_Status",
+                "Tax_Card_Status",
             ];
             if (!validSteps.includes(step)) {
                 throw new Error(`Invalid step: ${step}. Must be one of: ${validSteps.join(", ")}`);
@@ -145,7 +163,7 @@ class ChiefProfileService {
     async getVerificationSteps(profileId) {
         try {
             const profile = await ShopOwnerProfileSchema.findById(profileId).select(
-                "Products_Status Address_Status Payment_Method_Status Commercial_Register_Status National_ID_Status Is_Verified"
+                "Products_Status Address_Status Payment_Method_Status Commercial_Register_Status National_ID_Status Shop_Info_Status Tax_Record_Status Tax_Card_Status Is_Verified Verification_Status Rejection_Reason"
             );
             if (!profile) throw new Error("Profile not found");
             return { status: "success", steps: profile };
@@ -197,6 +215,7 @@ class ChiefProfileService {
                 {
                     National_ID_Front: frontImageURL,
                     National_ID_Back: backImageURL,
+                    National_ID_Status: "in_progress",
                 },
                 { new: true }
             );
@@ -207,20 +226,90 @@ class ChiefProfileService {
         }
     }
 
-    // 1ï¸âƒ£2ï¸âƒ£ Submit for admin review (chef calls this after all steps verified)
+    // ── Jewar shop onboarding steps ──
+
+    // Shop info step: shop name (+ optional cover image and category type)
+    async updateShopInfo(profileId, { name, shop_cover, Category_id, Subcategory_id }) {
+        try {
+            const updateFields = { Shop_Info_Status: "in_progress" };
+            if (name && String(name).trim()) updateFields.name = String(name).trim();
+            if (shop_cover) updateFields.shop_cover = shop_cover;
+            if (Category_id) updateFields.Category_id = Category_id;
+            if (Subcategory_id) updateFields.Subcategory_id = Subcategory_id;
+
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
+                profileId,
+                updateFields,
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to update shop info");
+        }
+    }
+
+    // Address step
+    async updateShopAddress(profileId, shop_address) {
+        try {
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
+                profileId,
+                {
+                    shop_address,
+                    Address_Status: "in_progress",
+                },
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to update shop address");
+        }
+    }
+
+    // Tax record image step
+    async uploadTaxRecord(profileId, taxRecordUrl) {
+        try {
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
+                profileId,
+                {
+                    Tax_Record: taxRecordUrl,
+                    Tax_Record_Status: "in_progress",
+                },
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to upload tax record");
+        }
+    }
+
+    // Tax card image step
+    async uploadTaxCard(profileId, taxCardUrl) {
+        try {
+            const updated = await ShopOwnerProfileSchema.findByIdAndUpdate(
+                profileId,
+                {
+                    Tax_Card: taxCardUrl,
+                    Tax_Card_Status: "in_progress",
+                },
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to upload tax card");
+        }
+    }
+
+    // 1ï¸âƒ£2ï¸âƒ£ Submit for admin review (shop owner calls this after all steps verified)
     async submitForReview(profileId) {
         try {
             const profile = await ShopOwnerProfileSchema.findById(profileId);
             if (!profile) throw new Error("Profile not found");
 
-            const steps = [
-                "Commercial_Register_Status",
-                "Address_Status",
-                "National_ID_Status",
-                "Payment_Method_Status",
-                "Products_Status",
-            ];
-            const pending = steps.filter(s => profile[s] !== "verified");
+            const pending = REQUIRED_VERIFICATION_STEPS.filter(s => profile[s] !== "verified");
             if (pending.length > 0) {
                 throw new Error(`Cannot submit: incomplete steps: ${pending.join(", ")}`);
             }
@@ -247,7 +336,7 @@ class ChiefProfileService {
                 const doc = p.toObject();
                 // fetch address from Address-Services
                 try {
-                    const addrRes = await fetch(`https://savoraaddress-services-production.up.railway.app/api/v1/address/?Profile_id=${doc._id}`);
+                    const addrRes = await fetch(`${ADDRESS_SERVICE_URL}/?Profile_id=${doc._id}`);
                     if (addrRes.ok) {
                         const addrData = await addrRes.json();
                         const addrs = addrData?.addresses ?? [];
@@ -260,7 +349,7 @@ class ChiefProfileService {
                 }
                 // fetch preferred dishes from PreferredDishChief-Services
                 try {
-                    const prefRes = await fetch(`https://savoradishprefered-services-production.up.railway.app/api/v1/preferred-dishes-chief/preferred/${doc._id}`);
+                    const prefRes = await fetch(`${PREFERRED_DISHES_SERVICE_URL}/preferred/${doc._id}`);
                     if (prefRes.ok) {
                         const prefData = await prefRes.json();
                         doc.preferredDishes = prefData?.preferred ?? [];
@@ -587,18 +676,18 @@ class ChiefProfileService {
         const o = order.toObject();
         // Enrich chef details
         if (o.chef_id) {
-          const chef = await ShopOwnerProfileSchema.findById(o.chef_id).select("name phone shop_address profile_image");
+          const chef = await ShopOwnerProfileSchema.findById(o.chef_id).select("name phone shop_address profile_image shop_cover");
           if (chef) {
             o.chef_name = chef.name;
             o.chef_phone = chef.phone;
             o.chef_address = chef.shop_address || "";
-            o.chef_image = chef.profile_image || "";
+            o.chef_image = chef.shop_cover || chef.profile_image || "";
           }
         }
         // Enrich customer details
         if (o.customer_id) {
           try {
-            const custRes = await fetch(`${process.env.CUSTOMER_SERVICE_URL || "https://savoracustomerprofile-services-production.up.railway.app/api/v1/customer-profile"}/auth/${o.customer_id}`, {
+            const custRes = await fetch(`${CUSTOMER_SERVICE_URL}/auth/${o.customer_id}`, {
               headers: { "Content-Type": "application/json" }
             });
             if (custRes.ok) {
@@ -664,8 +753,7 @@ class ChiefProfileService {
       // Update driver earnings via API call
       if (order.driver_id) {
          try {
-            const driverApiUrl = process.env.DRIVER_SERVICE_URL || "https://savora-driverprofileservices-production.up.railway.app/api/v2/driver-profile";
-            await fetch(`${driverApiUrl}/${order.driver_id}/earnings`, {
+            await fetch(`${DRIVER_SERVICE_URL}/${order.driver_id}/earnings`, {
                method: "PATCH",
                headers: { "Content-Type": "application/json" },
                body: JSON.stringify({ amount: 15 })
@@ -693,8 +781,7 @@ class ChiefProfileService {
       // Update driver rating via API
       if (driverRating && order.driver_id) {
         try {
-          const driverApiUrl = process.env.DRIVER_SERVICE_URL || "https://savora-driverprofileservices-production.up.railway.app/api/v2/driver-profile";
-          await fetch(`${driverApiUrl}/${order.driver_id}/rating`, {
+          await fetch(`${DRIVER_SERVICE_URL}/${order.driver_id}/rating`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ rating: driverRating })

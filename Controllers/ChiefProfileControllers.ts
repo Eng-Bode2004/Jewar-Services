@@ -152,6 +152,76 @@ class ChiefProfileController {
         }
     }
 
+    // ── Jewar shop onboarding steps ──
+
+    async updateShopInfo(req:Request, res:Response) {
+        try {
+            const { name, shop_cover, Category_id, Subcategory_id } = req.body;
+            if (!name && !shop_cover && !Category_id && !Subcategory_id) {
+                res.status(400).json({ status: "error", message: "Provide at least one of: name, shop_cover, Category_id, Subcategory_id" });
+                return;
+            }
+            const result = await ChiefProfileServices.updateShopInfo(req.params.id as string, { name, shop_cover, Category_id, Subcategory_id });
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
+    async updateShopAddress(req:Request, res:Response) {
+        try {
+            const { shop_address } = req.body;
+            if (!shop_address || !String(shop_address).trim()) {
+                res.status(400).json({ status: "error", message: "shop_address is required" });
+                return;
+            }
+            const result = await ChiefProfileServices.updateShopAddress(req.params.id as string, String(shop_address).trim());
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
+    async uploadTaxRecord(req:Request, res:Response) {
+        try {
+            const { taxRecordUrl } = req.body;
+            if (!taxRecordUrl) {
+                res.status(400).json({ status: "error", message: "taxRecordUrl is required" });
+                return;
+            }
+            const result = await ChiefProfileServices.uploadTaxRecord(req.params.id as string, taxRecordUrl);
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
+    async uploadTaxCard(req:Request, res:Response) {
+        try {
+            const { taxCardUrl } = req.body;
+            if (!taxCardUrl) {
+                res.status(400).json({ status: "error", message: "taxCardUrl is required" });
+                return;
+            }
+            const result = await ChiefProfileServices.uploadTaxCard(req.params.id as string, taxCardUrl);
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
     async submitForReview(req:Request, res:Response) {
         try {
             const result = await ChiefProfileServices.submitForReview(req.params.id as string);

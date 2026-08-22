@@ -47,6 +47,34 @@ const ShopOwnerProfileSchema = new mongoose.Schema({
         type: String,
     },
 
+    // ── Shop onboarding (Jewar shops) ──
+    shop_cover: {
+        type: String,
+        default: "",
+    },
+
+    Tax_Record: {
+        type: String,
+        default: "",
+    },
+
+    Tax_Card: {
+        type: String,
+        default: "",
+    },
+
+    // Shop type: main category (e.g. Food & Restaurants) and its subcategory
+    Category_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Category",
+    },
+
+    Subcategory_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "SubCategory",
+    },
+
+    // ── Verification step statuses (legacy steps kept for backward compat) ──
     Products_Status: stepStatus,
 
     Address_Status: stepStatus,
@@ -56,6 +84,13 @@ const ShopOwnerProfileSchema = new mongoose.Schema({
     Commercial_Register_Status: stepStatus,
 
     National_ID_Status: stepStatus,
+
+    // ── Jewar shop verification steps ──
+    Shop_Info_Status: stepStatus,
+
+    Tax_Record_Status: stepStatus,
+
+    Tax_Card_Status: stepStatus,
 
     Verification_Status: {
         type: String,
