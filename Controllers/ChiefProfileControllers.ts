@@ -424,7 +424,7 @@ class ChiefProfileController {
 
   async getAvailableOrdersForDriver(req:Request, res:Response) {
     try {
-      const result = await ChiefProfileServices.getAvailableOrdersForDriver();
+      const result = await ChiefProfileServices.getAvailableOrdersForDriver((req.query.driver_id as string) || undefined);
       res.status(200).json(result);
     } catch (error:unknown) {
       res.status(500).json({
@@ -438,6 +438,28 @@ class ChiefProfileController {
     try {
       const { driver_id } = req.body;
       const result = await ChiefProfileServices.acceptOrderDriver(req.params.id, driver_id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      const e = error as Error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
+
+  async proposeDeliveryOffer(req:Request, res:Response) {
+    try {
+      const { driver_id, driver_name, amount } = req.body;
+      const result = await ChiefProfileServices.proposeDeliveryOffer(req.params.id, driver_id, driver_name, amount);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      const e = error as Error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
+
+  async respondDeliveryOffer(req:Request, res:Response) {
+    try {
+      const { offer_id, accept } = req.body;
+      const result = await ChiefProfileServices.respondDeliveryOffer(req.params.id, offer_id, !!accept);
       res.status(200).json(result);
     } catch (error:unknown) {
       const e = error as Error;

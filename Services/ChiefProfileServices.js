@@ -707,9 +707,24 @@ class ChiefProfileService {
 
   // â”€â”€ Driver Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   
-  async getAvailableOrdersForDriver() {
+  async getAvailableOrdersForDriver(driverId) {
     try {
-      const orders = await OrderSchema.find({ order_status: "ready", driver_id: { $exists: false } }).sort({ createdAt: -1 });
+      // Only online + verified drivers may see the order pool.
+      if (driverId) {
+        let eligible = true;
+        try {
+          const dRes = await fetch(`${DRIVER_SERVICE_URL}/${driverId}`, { headers: { "Content-Type": "application/json" } });
+          if (dRes.ok) {
+            const dData = await dRes.json();
+            const driver = dData.profile || dData.driver || dData;
+            if (!driver.online_status || !driver.Is_Verified) eligible = false;
+          } else {
+            eligible = false;
+          }
+        } catch (_) { eligible = false; }
+        if (!eligible) return { status: "success", orders: [] };
+      }
+      const orders = await OrderSchema.find({ order_status: "ready", $or: [{ driver_id: { $exists: false } }, { driver_id: null }] }).sort({ createdAt: -1 });
       const enriched = await Promise.all(orders.map(async (order) => {
         const o = order.toObject();
         // Enrich chef details
@@ -747,6 +762,21 @@ class ChiefProfileService {
 
   async acceptOrderDriver(orderId, driverId) {
     try {
+      // Reject offline / unverified drivers.
+      if (driverId) {
+        try {
+          const dRes = await fetch(`${DRIVER_SERVICE_URL}/${driverId}`, { headers: { "Content-Type": "application/json" } });
+          if (dRes.ok) {
+            const dData = await dRes.json();
+            const driver = dData.profile || dData.driver || dData;
+            if (!driver.online_status || !driver.Is_Verified) {
+              throw new Error("Go online and complete account activation to accept orders");
+            }
+          }
+        } catch (e) {
+          if (e && e.message && e.message.includes("activation")) throw e;
+        }
+      }
       const order = await OrderSchema.findOneAndUpdate(
         { _id: orderId, driver_id: { $exists: false }, order_status: "ready" },
         { driver_id: driverId, order_status: "out_for_delivery" },
@@ -756,6 +786,77 @@ class ChiefProfileService {
       return { status: "success", order };
     } catch (error) {
       throw new Error(error.message || "Failed to accept order for driver");
+    }
+  }
+
+  // Uber-style negotiable delivery fee ─────────────────────────────
+
+  async proposeDeliveryOffer(orderId, driverId, driverName, amount) {
+    try {
+      if (!driverId) throw new Error("driver_id is required");
+      const price = Number(amount);
+      if (!Number.isFinite(price) || price <= 0) throw new Error("Invalid offer amount");
+
+      // Driver must be online + verified to bid.
+      try {
+        const dRes = await fetch(`${DRIVER_SERVICE_URL}/${driverId}`, { headers: { "Content-Type": "application/json" } });
+        if (dRes.ok) {
+          const dData = await dRes.json();
+          const driver = dData.profile || dData.driver || dData;
+          if (!driver.online_status || !driver.Is_Verified) {
+            throw new Error("Go online and complete account activation to send offers");
+          }
+        }
+      } catch (e) {
+        if (e && e.message && e.message.includes("activation")) throw e;
+      }
+
+      const order = await OrderSchema.findById(orderId);
+      if (!order) throw new Error("Order not found");
+      if (order.driver_id) throw new Error("Order already has a driver");
+      if (!["ready", "preparing", "accepted"].includes(order.order_status)) {
+        throw new Error("Order is not open for offers");
+      }
+      order.delivery_offers = (order.delivery_offers || []).filter(
+        (o) => o.status === "proposed" && String(o.driver_id) !== String(driverId)
+      );
+      order.delivery_offers.push({
+        driver_id: String(driverId),
+        driver_name: driverName || "Driver",
+        amount: price,
+        status: "proposed",
+        created_at: new Date(),
+      });
+      await order.save();
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to send offer");
+    }
+  }
+
+  async respondDeliveryOffer(orderId, offerId, accept) {
+    try {
+      const order = await OrderSchema.findById(orderId);
+      if (!order) throw new Error("Order not found");
+      const offer = (order.delivery_offers || []).id(offerId);
+      if (!offer) throw new Error("Offer not found");
+      if (offer.status !== "proposed") throw new Error("Offer already answered");
+      if (order.driver_id) throw new Error("Order already has a driver");
+
+      if (accept) {
+        for (const o of order.delivery_offers) {
+          o.status = o._id.toString() === offerId ? "accepted" : "rejected";
+        }
+        order.driver_id = offer.driver_id;
+        order.agreed_delivery_fee = offer.amount;
+        order.order_status = "out_for_delivery";
+      } else {
+        offer.status = "rejected";
+      }
+      await order.save();
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to respond to offer");
     }
   }
 

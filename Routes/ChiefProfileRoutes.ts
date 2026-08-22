@@ -118,6 +118,12 @@ router.get("/order/driver/:driverId", ShopOwnerProfileControllers.getDriverOrder
 // Driver: accept an order
 router.patch("/order/:id/driver-accept", ShopOwnerProfileControllers.acceptOrderDriver);
 
+// Driver: propose a negotiable delivery price (Uber-style)
+router.patch("/order/:id/delivery-offer", ShopOwnerProfileControllers.proposeDeliveryOffer);
+
+// Customer: accept/reject a driver's delivery offer
+router.patch("/order/:id/delivery-offer/respond", ShopOwnerProfileControllers.respondDeliveryOffer);
+
 // Driver: deliver an order
 router.patch("/order/:id/driver-deliver", ShopOwnerProfileControllers.deliverOrderDriver);
 

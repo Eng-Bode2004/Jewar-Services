@@ -13,6 +13,24 @@ const OrderSchema = new mongoose.Schema({
   customer_name: { type: String },
   chef_id: { type: String, index: true },
   driver_id: { type: String, index: true },
+  delivery_fee: { type: Number, default: 15 },
+  agreed_delivery_fee: { type: Number },
+  delivery_offers: [
+    new mongoose.Schema(
+      {
+        driver_id: { type: String, required: true },
+        driver_name: { type: String },
+        amount: { type: Number, required: true },
+        status: {
+          type: String,
+          enum: ["proposed", "accepted", "rejected"],
+          default: "proposed",
+        },
+        created_at: { type: Date, default: Date.now },
+      },
+      { timestamps: false }
+    ),
+  ],
   items: { type: [OrderItemSchema], required: true },
   total: { type: Number, required: true },
   payment_method: { type: String },
