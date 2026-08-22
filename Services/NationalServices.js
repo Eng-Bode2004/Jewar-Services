@@ -4,9 +4,17 @@ import axios from "axios";
 
 class NationalServices {
     constructor() {
-        this.client = new vision.ImageAnnotatorClient({
-            keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
-        });
+        // Auth priority: API key (easiest on Railway) > service-account file > ADC
+        const options = process.env.GOOGLE_VISION_API_KEY
+            ? { apiKey: process.env.GOOGLE_VISION_API_KEY }
+            : process.env.GOOGLE_APPLICATION_CREDENTIALS
+                ? { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS }
+                : {};
+        this.client = new vision.ImageAnnotatorClient(options);
+        this._hasCredentials = Boolean(
+            process.env.GOOGLE_VISION_API_KEY ||
+            process.env.GOOGLE_APPLICATION_CREDENTIALS
+        );
     }
 
     // Fetch image from URL and return as buffer
@@ -24,6 +32,11 @@ class NationalServices {
 
     // Extract 14-digit Egyptian ID number from image
     async extractIDNumber(imageURL) {
+        if (!this._hasCredentials) {
+            throw new Error(
+                "Google Vision is not configured: set GOOGLE_VISION_API_KEY (or GOOGLE_APPLICATION_CREDENTIALS) on the server"
+            );
+        }
         const buffer = await this.fetchImageBuffer(imageURL);
         const [result] = await this.client.textDetection({ image: { content: buffer } });
         const detections = result.textAnnotations;
