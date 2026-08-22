@@ -42,9 +42,24 @@ const DishSchema = new mongoose.Schema({
         ref: "SubCategory",
     },
 
+    // Shop owner this item belongs to (null = global catalog item)
+    Owner_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ShopOwner Profile",
+        default: null,
+        index: true,
+    },
+
     // ── Pricing & Unit ──
     price: { type: Number, default: 0, min: 0 },
     unit_type: { type: String, enum: ["kg", "pieces"], default: "pieces" },
+
+    // ── Stock ──
+    // stock_type "daily"    → food shops: owner sets the available quantity each day
+    // stock_type "regular"  → other shops: standard inventory count
+    stock_quantity: { type: Number, default: 0, min: 0 },
+    stock_type: { type: String, enum: ["daily", "regular"], default: "regular" },
+    available: { type: Boolean, default: true },
 
     // ── Image ──
     image: {
