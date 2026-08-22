@@ -124,5 +124,22 @@ router.patch("/order/:id/driver-deliver", ShopOwnerProfileControllers.deliverOrd
 // Customer: rate order and driver after completion
 router.post("/order/:id/rate", ShopOwnerProfileControllers.rateOrder);
 
+// ── Advertising ──────────────────────────────────────────────
+
+// Shop owner: create an ad (image uploaded via Image-Service first)
+router.post("/ad", ShopOwnerProfileControllers.createAd);
+
+// Customer app: all active ads
+router.get("/ads/active", ShopOwnerProfileControllers.getActiveAds);
+
+// Dashboard: my ads
+router.get("/ad/owner/:ownerId", ShopOwnerProfileControllers.getAdsByOwner);
+
+// Update ad (swap image, title, active toggle)
+router.patch("/ad/:id", ShopOwnerProfileControllers.updateAd);
+
+// Delete ad
+router.delete("/ad/:id", ShopOwnerProfileControllers.deleteAd);
+
 export default router;
 

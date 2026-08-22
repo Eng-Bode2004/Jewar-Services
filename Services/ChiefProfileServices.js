@@ -1,5 +1,6 @@
 ﻿import ShopOwnerProfileSchema from "../Models/ShopOwnerProfileSchema.js";
 import OrderSchema from "../Models/OrderSchema.js";
+import AdSchema from "../Models/AdSchema.js";
 import mongoose from "mongoose";
 
 const DailyDishAvailabilitySchema = new mongoose.Schema({
@@ -829,6 +830,60 @@ class ChiefProfileService {
       return { status: "success", order };
     } catch (error) {
       throw new Error(error.message || "Failed to rate order");
+    }
+  }
+
+  // ── Advertising ──────────────────────────────────────────────
+
+  async createAd(data) {
+    try {
+      const ad = await AdSchema.create(data);
+      return { status: "success", ad };
+    } catch (error) {
+      throw new Error(error.message || "Failed to create ad");
+    }
+  }
+
+  async getActiveAds() {
+    try {
+      const ads = await AdSchema.find({ active: true })
+        .sort({ createdAt: -1 })
+        .limit(20);
+      return { status: "success", ads };
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch ads");
+    }
+  }
+
+  async getAdsByOwner(ownerId) {
+    try {
+      const ads = await AdSchema.find({ owner_id: ownerId }).sort({ createdAt: -1 });
+      return { status: "success", ads };
+    } catch (error) {
+      throw new Error(error.message || "Failed to fetch owner ads");
+    }
+  }
+
+  async updateAd(id, data) {
+    try {
+      const allowed = ["image_url", "title", "subtitle", "active"];
+      const updates = {};
+      for (const key of allowed) if (data[key] !== undefined) updates[key] = data[key];
+      const ad = await AdSchema.findByIdAndUpdate(id, updates, { new: true });
+      if (!ad) throw new Error("Ad not found");
+      return { status: "success", ad };
+    } catch (error) {
+      throw new Error(error.message || "Failed to update ad");
+    }
+  }
+
+  async deleteAd(id) {
+    try {
+      const ad = await AdSchema.findByIdAndDelete(id);
+      if (!ad) throw new Error("Ad not found");
+      return { status: "success" };
+    } catch (error) {
+      throw new Error(error.message || "Failed to delete ad");
     }
   }
 

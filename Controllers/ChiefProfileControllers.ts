@@ -492,6 +492,68 @@ class ChiefProfileController {
     }
   }
 
+  // ── Advertising ──────────────────────────────────────────────
+
+  async createAd(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.createAd(req.body);
+      res.status(201).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async getActiveAds(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.getActiveAds();
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(500).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async getAdsByOwner(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.getAdsByOwner(req.params.ownerId);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(500).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async updateAd(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.updateAd(req.params.id, req.body);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async deleteAd(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.deleteAd(req.params.id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
 }
 
 export default new ChiefProfileController();
