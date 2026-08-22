@@ -123,6 +123,43 @@ router.post(
     ImagesControllers.uploadPhoto
 );
 
+// ── Jewar shop onboarding documents ──
+
+router.post(
+    "/shop-cover",
+    (req, _res, next) => { req.uploadFolder = "Jewar/Shops/Cover"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
+    "/shop-id-front",
+    (req, _res, next) => { req.uploadFolder = "Jewar/Shops/IDFront"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
+    "/shop-id-back",
+    (req, _res, next) => { req.uploadFolder = "Jewar/Shops/IDBack"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
+    "/tax-record",
+    (req, _res, next) => { req.uploadFolder = "Jewar/Shops/TaxRecord"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
+router.post(
+    "/tax-card",
+    (req, _res, next) => { req.uploadFolder = "Jewar/Shops/TaxCard"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
 router.get("/:id", ImagesControllers.getPhotoById);
 
 router.delete("/:id", ImagesControllers.deletePhoto);
