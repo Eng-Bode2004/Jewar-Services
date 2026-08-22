@@ -74,6 +74,17 @@ const CustomerProfileSchema = new mongoose.Schema(
       ref: "Product",
     }],
 
+    preferred_shop_types: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Subcategory",
+    }],
+
+    // Shops the customer loves (verification step 3)
+    preferred_shops: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ShopOwner Profile",
+    }],
+
   },
   { timestamps: true }
 );
