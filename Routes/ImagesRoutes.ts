@@ -160,6 +160,15 @@ router.post(
     ImagesControllers.uploadPhoto
 );
 
+// ── Advertising banners ──
+
+router.post(
+    "/advertising-image",
+    (req, _res, next) => { req.uploadFolder = "Jewar/Advertising"; next(); },
+    upload.single("image"),
+    ImagesControllers.uploadPhoto
+);
+
 router.get("/:id", ImagesControllers.getPhotoById);
 
 router.delete("/:id", ImagesControllers.deletePhoto);
