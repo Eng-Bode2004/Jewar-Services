@@ -12,7 +12,12 @@ app.use(express.json());
 app.use("/api/v2/driver-profile", DriverProfileRoutes);
 
 const PORT = process.env.PORT || 5013;
-const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/Savora";
+// Accept both spellings used across the platform's services
+const MONGO_URI = process.env.MONGOURI || process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+    console.error("❌ CRITICAL: MONGOURI is undefined!");
+}
 
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ MongoDB connected successfully"))
