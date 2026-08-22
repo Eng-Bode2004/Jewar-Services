@@ -26,6 +26,7 @@ const REQUIRED_VERIFICATION_STEPS = [
     "National_ID_Status",
     "Tax_Record_Status",
     "Tax_Card_Status",
+    "Payment_Method_Status",
 ];
 
 class ChiefProfileService {
