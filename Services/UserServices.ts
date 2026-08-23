@@ -1,4 +1,4 @@
-﻿import UserModel from "../Models/UserSchema.ts";
+import UserModel from "../Models/UserSchema.ts";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -362,8 +362,34 @@ class UserServices {
     }
 
     async DeleteUser(id: string) {
-        const user = await UserModel.findByIdAndDelete(id);
+        const user = await UserModel.findById(id);
         if (!user) throw new Error("User not found");
+
+        const db = mongoose.connection.db;
+
+        // Find associated CustomerProfile
+        const profile = await db.collection('customerprofiles').findOne({ auth_id: new mongoose.Types.ObjectId(id) });
+        if (profile) {
+            const IMAGES_SVC = process.env.IMAGES_SERVICE_URL || "https://jewarimage-services-production.up.railway.app/api/v2/images";
+            async function deleteUrl(url: string) {
+                if(!url) return;
+                try {
+                    await fetch(`${IMAGES_SVC}/delete-by-url`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    });
+                } catch(e) {}
+            }
+
+            if(profile.profile_image) await deleteUrl(profile.profile_image);
+
+            await db.collection('addresses').deleteMany({ Profile_id: profile._id });
+            await db.collection('orders').deleteMany({ customer_id: profile._id });
+            await db.collection('customerprofiles').deleteOne({ _id: profile._id });
+        }
+
+        await UserModel.findByIdAndDelete(id);
         return user;
     }
 }
