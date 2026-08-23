@@ -103,39 +103,58 @@ class ChiefProfileService {
         }
     }
 
-    // 5️⃣ Delete profile by ID
+    // 5ï¸âƒ£ Delete profile by ID
     async deleteProfile(profileId) {
         try {
             const profile = await ShopOwnerProfileSchema.findById(profileId);
             if (!profile) throw new Error("Profile not found");
 
-            const db = mongoose.connection.db;
-
-            // Delete images
-            const imageUrls = [profile.profile_image, profile.shop_cover, profile.ID_Front_image, profile.ID_Back_image, profile.commercial_register_image].filter(Boolean);
-            
-            const dishes = await db.collection('dishes').find({ chef_id: profileId }).toArray();
-            for (const d of dishes) if (d.image) imageUrls.push(d.image);
-            
-            const ads = await db.collection('ads').find({ owner_id: profileId }).toArray();
-            for (const a of ads) if (a.image_url) imageUrls.push(a.image_url);
-
-            for (const url of imageUrls) {
+            const IMAGES_SVC = process.env.IMAGES_SERVICE_URL || "https://jewarimage-services-production.up.railway.app/api/v2/images";
+            async function deleteUrl(url) {
+                if(!url) return;
                 try {
-                    await fetch('http://localhost:5004/api/v2/images/delete-by-url', {
+                    await fetch(`${IMAGES_SVC}/delete-by-url`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url })
                     });
-                } catch (_) {}
+                } catch(e) {}
             }
 
-            // Drop collections
-            await db.collection('dishes').deleteMany({ chef_id: profileId });
-            await db.collection('ads').deleteMany({ owner_id: profileId });
-            await db.collection('orders').deleteMany({ chef_id: profileId });
-            await db.collection('addresses').deleteMany({ user_id: profile.userId });
-            await db.collection('users').deleteOne({ _id: new mongoose.Types.ObjectId(profile.userId) });
+            // 1. Delete profile images
+            const imgFields = ['profile_image', 'shop_cover', 'front_ID', 'back_ID', 'health_certificate', 'tax_record', 'tax_card', 'Payment_Method_Image'];
+            for(let f of imgFields) {
+                if(profile[f]) await deleteUrl(profile[f]);
+            }
+
+            const db = mongoose.connection.db;
+
+            // 2. Delete Ads and their images
+            const ads = await db.collection('ads').find({ chief_id: new mongoose.Types.ObjectId(profileId) }).toArray();
+            for(let ad of ads) {
+                if(ad.image) await deleteUrl(ad.image);
+            }
+            await db.collection('ads').deleteMany({ chief_id: new mongoose.Types.ObjectId(profileId) });
+
+            // 3. Delete Dishes and their images
+            const dishes = await db.collection('dishes').find({ Owner_id: new mongoose.Types.ObjectId(profileId) }).toArray();
+            for(let d of dishes) {
+                if(d.image) await deleteUrl(d.image);
+            }
+            await db.collection('dishes').deleteMany({ Owner_id: new mongoose.Types.ObjectId(profileId) });
+
+            // 4. Delete Address
+            await db.collection('addresses').deleteMany({ Profile_id: new mongoose.Types.ObjectId(profileId) });
+
+            // 5. Delete Orders
+            await db.collection('orders').deleteMany({ chef_id: new mongoose.Types.ObjectId(profileId) });
+
+            // 6. Delete User from User Service
+            if(profile.Auth_id) {
+                await db.collection('users').deleteOne({ _id: new mongoose.Types.ObjectId(profile.Auth_id) });
+            }
+
+            // 7. Finally delete the profile
             await ShopOwnerProfileSchema.findByIdAndDelete(profileId);
 
             return { status: "success", message: "Profile and all related data deleted successfully" };
@@ -737,7 +756,17 @@ class ChiefProfileService {
 
   // â”€â”€ Driver Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   
-  async getAvailableOrdersForDriver(driverId) {
+    try {
+      // Only online + verified drivers may see the order pool.
+      if (driverId) {
+        let eligible = true;
+        try {
+          const dRes = await fetch(`${DRIVER_SERVICE_URL}/${driverId}`, { headers: { "Content-Type": "application/json" } });
+          if (dRes.ok) {
+            const dData = await dRes.json();
+            const driver = dData.profile || dData.driver || dData;
+            if (!driver.online_status || !driver.Is_Verified) eligible = false;
+          } else {
     try {
       // Only online + verified drivers may see the order pool.
       if (driverId) {
@@ -754,7 +783,15 @@ class ChiefProfileService {
         } catch (_) { eligible = false; }
         if (!eligible) return { status: "success", orders: [] };
       }
-      const orders = await OrderSchema.find({ order_status: "ready", $or: [{ driver_id: { $exists: false } }, { driver_id: null }] }).sort({ createdAt: -1 });
+      const orders = await OrderSchema.find({
+        $or: [
+          { order_status: "ready" },
+          { order_status: "pending", chef_id: { $exists: false } },
+          { order_status: "pending", chef_id: null },
+          { order_status: "pending", chef_id: "" }
+        ],
+        $or: [{ driver_id: { $exists: false } }, { driver_id: null }]
+      }).sort({ createdAt: -1 });
       const enriched = await Promise.all(orders.map(async (order) => {
         const o = order.toObject();
         // Enrich chef details
