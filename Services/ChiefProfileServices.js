@@ -767,6 +767,7 @@ class ChiefProfileService {
   async getAvailableOrdersForDriver(driverId) {
     try {
       // Only online + verified drivers may see the order pool.
+      let driverRating = 0;
       if (driverId) {
         let eligible = true;
         try {
@@ -775,13 +776,23 @@ class ChiefProfileService {
             const dData = await dRes.json();
             const driver = dData.profile || dData.driver || dData;
             if (!driver.online_status || !driver.Is_Verified) eligible = false;
+            driverRating = driver.rating || 0;
           } else {
             eligible = false;
           }
         } catch (_) { eligible = false; }
         if (!eligible) return { status: "success", orders: [] };
       }
-      const orders = await OrderSchema.find({ order_status: "ready", $or: [{ driver_id: { $exists: false } }, { driver_id: null }] }).sort({ createdAt: -1 });
+
+      // Rating-based priority: top drivers (rating >= 4.0) see the full order pool
+      // immediately, while lower-rated drivers only see orders older than 30 seconds,
+      // giving high-rated drivers a head start on new orders.
+      const baseQuery = { order_status: "ready", $or: [{ driver_id: { $exists: false } }, { driver_id: null }] };
+      if (driverRating < 4) {
+        const cutoff = new Date(Date.now() - 30 * 1000);
+        baseQuery.createdAt = { $lte: cutoff };
+      }
+      const orders = await OrderSchema.find(baseQuery).sort({ createdAt: -1 });
       const enriched = await Promise.all(orders.map(async (order) => {
         const o = order.toObject();
         // Enrich chef details

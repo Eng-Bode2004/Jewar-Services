@@ -40,6 +40,18 @@ class ChiefProfileController {
         }
     }
 
+    async getByAuthId(req:Request, res:Response) {
+        try {
+            const result = await ChiefProfileServices.getAllProfiles({ auth_id: req.params.authId });
+            res.status(200).json(result);
+        } catch (error:unknown) {
+            res.status(500).json({
+                status: "error",
+                message: error instanceof Error ? error.message : "Unknown error"
+            });
+        }
+    }
+
     async update(req:Request, res:Response) {
         try {
             const result = await ChiefProfileServices.updateProfile(req.params.id, req.body);
