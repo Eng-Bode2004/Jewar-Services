@@ -111,18 +111,11 @@ class ChiefProfileService {
 
             const db = mongoose.connection.db;
 
-            // Delete images
-            const imageUrls = [profile.profile_image, profile.shop_cover, profile.ID_Front_image, profile.ID_Back_image, profile.commercial_register_image].filter(Boolean);
-            
-            const dishes = await db.collection('dishes').find({ chef_id: profileId }).toArray();
-            for (const d of dishes) if (d.image) imageUrls.push(d.image);
-            
-            const ads = await db.collection('ads').find({ owner_id: profileId }).toArray();
-            for (const a of ads) if (a.image_url) imageUrls.push(a.image_url);
-
-            for (const url of imageUrls) {
+            const IMAGES_SVC = process.env.IMAGES_SERVICE_URL || "https://jewarimage-services-production.up.railway.app/api/v2/images";
+            async function deleteUrl(url) {
+                if (!url) return;
                 try {
-                    await fetch('http://localhost:5004/api/v2/images/delete-by-url', {
+                    await fetch(`${IMAGES_SVC}/delete-by-url`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url })
@@ -130,12 +123,46 @@ class ChiefProfileService {
                 } catch (_) {}
             }
 
-            // Drop collections
-            await db.collection('dishes').deleteMany({ chef_id: profileId });
-            await db.collection('ads').deleteMany({ owner_id: profileId });
-            await db.collection('orders').deleteMany({ chef_id: profileId });
-            await db.collection('addresses').deleteMany({ user_id: profile.userId });
-            await db.collection('users').deleteOne({ _id: new mongoose.Types.ObjectId(profile.userId) });
+            const sidStr = String(profileId);
+            let sidOid = null;
+            try { sidOid = new mongoose.Types.ObjectId(sidStr); } catch (_) {}
+            const both = (field) => sidOid ? { $or: [{ [field]: sidStr }, { [field]: sidOid }] } : { [field]: sidStr };
+
+            // Delete images (correct schema fields: National_ID_Front/Back,
+            // Commercial_Register, Tax_Record, Tax_Card)
+            const imageUrls = [
+                profile.profile_image,
+                profile.shop_cover,
+                profile.National_ID_Front,
+                profile.National_ID_Back,
+                profile.Commercial_Register,
+                profile.Tax_Record,
+                profile.Tax_Card,
+            ].filter(Boolean);
+
+            // Dishes reference the shop via ObjectId Owner_id
+            const dishMatch = { Owner_id: sidOid || sidStr };
+            const dishes = await db.collection('dishes').find(dishMatch, { projection: { image: 1 } }).toArray();
+            for (const d of dishes) if (d.image) imageUrls.push(d.image);
+
+            const ads = await db.collection('ads').find(both('owner_id'), { projection: { image_url: 1 } }).toArray();
+            for (const a of ads) if (a.image_url) imageUrls.push(a.image_url);
+
+            for (const url of imageUrls) await deleteUrl(url);
+
+            // Drop related data
+            await db.collection('dishes').deleteMany(dishMatch);
+            await db.collection('ads').deleteMany(both('owner_id'));
+            await db.collection('preferreddishchiefs').deleteMany(both('chief_id'));
+            await db.collection('dailydishavailabilities').deleteMany(both('chief_id'));
+            await db.collection('orders').deleteMany(both('chef_id'));
+            // auth_id is a plain string on this schema
+            if (profile.auth_id) {
+                let uid = null;
+                try { uid = new mongoose.Types.ObjectId(String(profile.auth_id)); } catch (_) {}
+                if (uid) await db.collection('users').deleteOne({ _id: uid });
+            }
+            await db.collection('addresses').deleteMany({ Profile_id: new mongoose.Types.ObjectId(sidStr) });
             await ShopOwnerProfileSchema.findByIdAndDelete(profileId);
 
             return { status: "success", message: "Profile and all related data deleted successfully" };
