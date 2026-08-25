@@ -1,4 +1,5 @@
 import DriverProfileModel from "../Models/DriverProfileModel.ts";
+import mongoose from "mongoose";
 
 class DriverProfileService {
     async createProfile(data) {
@@ -55,9 +56,62 @@ class DriverProfileService {
 
     async deleteProfile(profileId) {
         try {
-            const deleted = await DriverProfileModel.findByIdAndDelete(profileId);
-            if (!deleted) throw new Error("Profile not found");
-            return { status: "success", message: "Profile deleted successfully" };
+            const profile = await DriverProfileModel.findById(profileId);
+            if (!profile) throw new Error("Profile not found");
+
+            const IMAGES_SVC = process.env.IMAGES_SERVICE_URL || "https://jewarimage-services-production.up.railway.app/api/v2/images";
+            async function deleteUrl(url) {
+                if(!url) return;
+                try {
+                    await fetch(`${IMAGES_SVC}/delete-by-url`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    });
+                } catch(e) {}
+            }
+
+            // 1. Delete profile images
+            const imgFields = ['profile_image'];
+            for(let f of imgFields) {
+                if(profile[f]) await deleteUrl(profile[f]);
+            }
+            if(profile.documents) {
+                if(profile.documents.id_front) await deleteUrl(profile.documents.id_front);
+                if(profile.documents.id_back) await deleteUrl(profile.documents.id_back);
+            }
+            if(profile.license) {
+                if(profile.license.front_image) await deleteUrl(profile.license.front_image);
+                if(profile.license.back_image) await deleteUrl(profile.license.back_image);
+                if(profile.license.vehicle_license_image) await deleteUrl(profile.license.vehicle_license_image);
+            }
+            if(profile.vehicle && profile.vehicle.image) {
+                await deleteUrl(profile.vehicle.image);
+            }
+
+            const db = mongoose.connection.db;
+
+            // 2. Clear driver from orders (driver_id may be stored as string or ObjectId)
+            const didStr = String(profileId);
+            let didOid = null;
+            try { didOid = new mongoose.Types.ObjectId(didStr); } catch (_) {}
+            await db.collection('orders').updateMany(
+                didOid ? { $or: [{ driver_id: didStr }, { driver_id: didOid }] } : { driver_id: didStr },
+                { $unset: { driver_id: 1, driver_name: 1 } }
+            );
+
+            // 3. Delete Address (if driver has one)
+            await db.collection('addresses').deleteMany({ Profile_id: new mongoose.Types.ObjectId(profileId) });
+
+            // 4. Delete User from User Service
+            if(profile.auth_id) {
+                await db.collection('users').deleteOne({ _id: new mongoose.Types.ObjectId(profile.auth_id) });
+            }
+
+            // 5. Finally delete the profile
+            await DriverProfileModel.findByIdAndDelete(profileId);
+
+            return { status: "success", message: "Profile and all related data deleted successfully" };
         } catch (error) {
             throw new Error(error.message || "Failed to delete profile");
         }
@@ -65,7 +119,7 @@ class DriverProfileService {
 
     async updateVerificationStep(profileId, step, status) {
         try {
-            const validSteps = ["Documents_Status", "Vehicle_Status", "Background_Check_Status"];
+            const validSteps = ["Documents_Status", "Vehicle_Status", "Background_Check_Status", "Verification_Status"];
             if (!validSteps.includes(step)) {
                 throw new Error(`Invalid step: ${step}. Must be one of: ${validSteps.join(", ")}`);
             }
