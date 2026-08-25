@@ -1,4 +1,5 @@
 import UserModel from "../Models/UserSchema.ts";
+import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -366,29 +367,123 @@ class UserServices {
         if (!user) throw new Error("User not found");
 
         const db = mongoose.connection.db;
+        if (!db) throw new Error("Database not connected");
 
-        // Find associated CustomerProfile
-        const profile = await db.collection('customerprofiles').findOne({ auth_id: new mongoose.Types.ObjectId(id) });
-        if (profile) {
-            const IMAGES_SVC = process.env.IMAGES_SERVICE_URL || "https://jewarimage-services-production.up.railway.app/api/v2/images";
-            async function deleteUrl(url: string) {
-                if(!url) return;
-                try {
-                    await fetch(`${IMAGES_SVC}/delete-by-url`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url })
-                    });
-                } catch(e) {}
-            }
+        const IMAGES_SVC = process.env.IMAGES_SERVICE_URL || "https://jewarimage-services-production.up.railway.app/api/v2/images";
+        async function deleteUrl(url?: string | null) {
+            if (!url) return;
+            try {
+                await fetch(`${IMAGES_SVC}/delete-by-url`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+            } catch(e) {}
+        }
+        const oid = (v: unknown): mongoose.Types.ObjectId | null => {
+            try { return new mongoose.Types.ObjectId(String(v)); } catch { return null; }
+        };
 
-            if(profile.profile_image) await deleteUrl(profile.profile_image);
+        // ────────────────────────────────────────────────────────────────
+        // 1) Customer profile cascade
+        // ────────────────────────────────────────────────────────────────
+        const cProfile = await db.collection('customerprofiles').findOne({
+            $or: [{ auth_id: oid(id) }, { auth_id: id as any }]
+        });
+        if (cProfile) {
+            // NOTE: schema field is `avatar` (not profile_image)
+            await deleteUrl(cProfile.avatar);
 
-            await db.collection('addresses').deleteMany({ Profile_id: profile._id });
-            await db.collection('orders').deleteMany({ customer_id: profile._id });
-            await db.collection('customerprofiles').deleteOne({ _id: profile._id });
+            const cid = cProfile._id;
+            const cidStr = String(cid);
+            await db.collection('addresses').deleteMany({ Profile_id: cid });
+            // orders store customer_id/chef_id/driver_id as strings
+            await db.collection('orders').deleteMany({ customer_id: { $in: [cidStr, cid] } });
+            await db.collection('customerprofiles').deleteOne({ _id: cid });
         }
 
+        // ────────────────────────────────────────────────────────────────
+        // 2) Driver profile cascade
+        // ────────────────────────────────────────────────────────────────
+        const dProfile = await db.collection('driver profiles').findOne({
+            $or: [{ auth_id: oid(id) }, { auth_id: id as any }]
+        });
+        if (dProfile) {
+            const did = dProfile._id;
+            const didStr = String(did);
+            const didOid = oid(didStr);
+
+            // Cloudinary images: avatar, vehicle, license, documents
+            const dUrls: (string | null | undefined)[] = [
+                dProfile.profile_image,
+                dProfile?.vehicle?.image,
+                dProfile?.license?.front_image,
+                dProfile?.license?.back_image,
+                dProfile?.license?.vehicle_license_image,
+                dProfile?.documents?.id_front,
+                dProfile?.documents?.id_back,
+                dProfile?.documents?.background_check,
+            ];
+            for (const u of dUrls) await deleteUrl(u);
+
+            // Detach driver from orders (driver_id stored as string or ObjectId)
+            const driverMatch = didOid ? { $or: [{ driver_id: didStr }, { driver_id: didOid }] } : { driver_id: didStr };
+            await db.collection('orders').updateMany(driverMatch, { $unset: { driver_id: 1, driver_name: 1 } });
+
+            await db.collection('addresses').deleteMany({ Profile_id: did });
+            await db.collection('driver profiles').deleteOne({ _id: did });
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // 3) Shop owner profile cascade
+        // ────────────────────────────────────────────────────────────────
+        const sProfile = await db.collection('shopowner profiles').findOne({
+            $or: [{ auth_id: oid(id) }, { auth_id: id as any }]
+        });
+        if (sProfile) {
+            const sid = sProfile._id;
+            const sidStr = String(sid);
+            const sidOid = oid(sidStr);
+
+            const sUrls: (string | null | undefined)[] = [
+                sProfile.profile_image,
+                sProfile.shop_cover,
+                sProfile.National_ID_Front,
+                sProfile.National_ID_Back,
+                sProfile.Commercial_Register,
+                sProfile.Tax_Record,
+                sProfile.Tax_Card,
+            ];
+
+            // Dishes reference the shop via ObjectId `Owner_id`
+            const dishMatch = sidOid ? { Owner_id: sidOid } : { Owner_id: sid };
+            const dishes = await db.collection('dishes').find(dishMatch, { projection: { image: 1 } }).toArray();
+            for (const d of dishes) if (d?.image) sUrls.push(d.image);
+
+            const adMatch = sidOid ? { $or: [{ owner_id: sidStr }, { owner_id: sidOid }] } : { owner_id: sidStr };
+            const ads = await db.collection('ads').find(adMatch, { projection: { image_url: 1 } }).toArray();
+            for (const a of ads) if (a?.image_url) sUrls.push(a.image_url);
+
+            for (const u of sUrls) await deleteUrl(u);
+
+            await db.collection('dishes').deleteMany(dishMatch);
+            await db.collection('ads').deleteMany(adMatch);
+            await db.collection('preferreddishchiefs').deleteMany(
+                sidOid ? { $or: [{ chief_id: sidStr }, { chief_id: sidOid }] } : { chief_id: sidStr }
+            );
+            await db.collection('dailydishavailabilities').deleteMany(
+                sidOid ? { $or: [{ chief_id: sidStr }, { chief_id: sidOid }] } : { chief_id: sidStr }
+            );
+            await db.collection('orders').deleteMany(
+                sidOid ? { $or: [{ chef_id: sidStr }, { chef_id: sidOid }] } : { chef_id: sidStr }
+            );
+            await db.collection('addresses').deleteMany({ Profile_id: sid });
+            await db.collection('shopowner profiles').deleteOne({ _id: sid });
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // 4) Finally, the user document itself (also kills refresh tokens)
+        // ────────────────────────────────────────────────────────────────
         await UserModel.findByIdAndDelete(id);
         return user;
     }
