@@ -487,6 +487,107 @@ class UserServices {
         await UserModel.findByIdAndDelete(id);
         return user;
     }
+
+    // ── Social Login (Google / Apple) ─────────────────────────────────────
+
+    async SocialLogin(provider: "google" | "apple", providerId: string, email?: string, name?: string, photoUrl?: string) {
+        // Try to find existing user by social provider ID or email
+        let user = await UserModel.findOne({ [`social_${provider}_id`]: providerId });
+        if (!user && email) {
+            user = await UserModel.findOne({ email });
+            if (user) {
+                // Link the social provider ID to existing account
+                (user as any)[`social_${provider}_id`] = providerId;
+                await user.save();
+            }
+        }
+
+        let isNew = false;
+        if (!user) {
+            isNew = true;
+            const username = await this.GenerateRandomUsername();
+            const userData: Record<string, any> = {
+                username,
+                password: "social_only",
+                isActive: true,
+                isUserVerified: true,
+            };
+            if (email) userData.email = email;
+            (userData as any)[`social_${provider}_id`] = providerId;
+            user = await UserModel.create(userData);
+
+            // Auto-create customer profile
+            const CUSTOMER_PROFILE_SERVICE_URL = process.env.CUSTOMER_PROFILE_SERVICE_URL || "http://localhost:5009";
+            try {
+                const profileRes = await fetch(`${CUSTOMER_PROFILE_SERVICE_URL}/api/v1/customer-profile`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        auth_id: user._id,
+                        name: name || username,
+                        email: email || "",
+                        avatar: photoUrl || "",
+                    }),
+                });
+                if (profileRes.ok) {
+                    const profileData: any = await profileRes.json();
+                    const profileId = profileData?.response?._id || profileData?._id;
+                    if (profileId) {
+                        await UserModel.findByIdAndUpdate(user._id, { profile: profileId });
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to create customer profile for social user:", err);
+            }
+        } else {
+            // Returning user — ensure active
+            user.isActive = true;
+            if (name && !user.username) user.username = name;
+            await user.save();
+        }
+
+        const JWT_SECRET = process.env.JWT_SECRET || "savora_jwt_secret_dev";
+        const token = jwt.sign(
+            { id: user._id, role: user.role },
+            JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        // Fetch role details if assigned
+        let roleData: Record<string, any> | null = null;
+        if (user.role) {
+            try {
+                const ROLE_SERVICE_URL = process.env.ROLE_SERVICE_URL || "https://jewarrole-services-production.up.railway.app";
+                const res = await fetch(`${ROLE_SERVICE_URL}/api/v1/roles/${user.role}`);
+                if (res.ok) {
+                    const body: any = await res.json();
+                    roleData = body.data ?? null;
+                }
+            } catch (err) {
+                console.error("Failed to fetch role details:", err);
+            }
+        }
+
+        // Fetch customer profile if linked
+        let profileData: Record<string, any> | null = null;
+        if (user.profile) {
+            try {
+                const CUSTOMER_PROFILE_SERVICE_URL = process.env.CUSTOMER_PROFILE_SERVICE_URL || "http://localhost:5009";
+                const res = await fetch(`${CUSTOMER_PROFILE_SERVICE_URL}/api/v1/customer-profile/${user.profile}`);
+                if (res.ok) {
+                    const body: any = await res.json();
+                    profileData = body?.response ?? body?.data ?? body ?? null;
+                }
+            } catch (err) {
+                console.error("Failed to fetch customer profile:", err);
+            }
+        }
+
+        const userObj = user.toObject();
+        const { password: _, refreshToken: __, ...safeUser } = userObj;
+
+        return { user: safeUser, token, role: roleData, profile: profileData, isNew };
+    }
 }
 
 export default new UserServices();
