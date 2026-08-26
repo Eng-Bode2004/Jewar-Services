@@ -536,6 +536,21 @@ class ChiefProfileService {
     }
   }
 
+  async updateOrder(orderId, data) {
+    try {
+      const allowed = ["total", "payment_image", "payment_method", "delivery_fee"];
+      const update = {};
+      for (const key of allowed) {
+        if (data[key] !== undefined) update[key] = data[key];
+      }
+      const order = await OrderSchema.findByIdAndUpdate(orderId, update, { new: true });
+      if (!order) throw new Error("Order not found");
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to update order");
+    }
+  }
+
   async verifyPayment(orderId, status, bodyChefId) {
     try {
       if (!["approved", "rejected"].includes(status)) {

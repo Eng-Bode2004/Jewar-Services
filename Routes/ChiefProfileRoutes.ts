@@ -92,6 +92,9 @@ router.get("/order/customer/:customerId", ShopOwnerProfileControllers.getCustome
 // Get a single order by ID
 router.get("/order/:id", ShopOwnerProfileControllers.getOrderById);
 
+// Update order fields (total, payment_image, etc.)
+router.patch("/order/:id", ShopOwnerProfileControllers.updateOrder);
+
 // Admin: verify/reject payment for an order
 router.patch("/order/:id/payment-verify", ShopOwnerProfileControllers.verifyPayment);
 
