@@ -1,5 +1,5 @@
 {
-  "name": "dish-services",
+  "name": "item-services",
   "module": "server.ts",
   "type": "module",
   "private": true,

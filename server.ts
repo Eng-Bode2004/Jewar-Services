@@ -14,5 +14,5 @@ app.use("/api/v1/dishes", DishRoutes);
 const PORT = process.env.PORT || 5002;
 
 app.listen(PORT, () => {
-    console.log(`🚀 Dish-Services running on port ${PORT}`);
+    console.log(`🚀 Item-Services running on port ${PORT}`);
 });

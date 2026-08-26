@@ -1,4 +1,4 @@
-# dish-services
+# item-services
 
 To install dependencies:
 
