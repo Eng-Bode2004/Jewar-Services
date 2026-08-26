@@ -86,6 +86,22 @@ const UserSchema = new mongoose.Schema(
             default: false,
         },
 
+        // ── Social Login ──────────────────────────────────────────────────────
+
+        social_google_id: {
+            type:   String,
+            unique: true,
+            sparse: true,
+            trim:   true,
+        },
+
+        social_apple_id: {
+            type:   String,
+            unique: true,
+            sparse: true,
+            trim:   true,
+        },
+
     },
 
     // ── Schema Options ─────────────────────────────────────────────────────────

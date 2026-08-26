@@ -348,6 +348,31 @@ class UserControllers {
             });
         }
     }
+
+    async socialLogin(req: Request, res: Response) {
+        try {
+            const { provider, providerId, email, name, photoUrl } = req.body;
+            if (!provider || !providerId) {
+                res.status(400).json({ error: "provider and providerId are required", statusCode: 400 });
+                return;
+            }
+            if (provider !== "google" && provider !== "apple") {
+                res.status(400).json({ error: "provider must be 'google' or 'apple'", statusCode: 400 });
+                return;
+            }
+            const result = await UserServices.SocialLogin(provider, providerId, email, name, photoUrl);
+            res.status(200).json({
+                message: result.isNew ? "Account created via $provider" : "Logged in via $provider",
+                statusCode: 200,
+                data: result,
+            });
+        } catch (error: unknown) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : "Social login failed",
+                statusCode: 500,
+            });
+        }
+    }
 }
 
 export default new UserControllers();
