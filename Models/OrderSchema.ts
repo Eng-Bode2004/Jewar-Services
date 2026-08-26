@@ -15,6 +15,7 @@ const OrderSchema = new mongoose.Schema({
   driver_id: { type: String, index: true },
   delivery_fee: { type: Number, default: 15 },
   agreed_delivery_fee: { type: Number },
+  delivery_payment_method: { type: String, enum: ["online", "cash"], default: "online" },
   delivery_offers: [
     new mongoose.Schema(
       {
