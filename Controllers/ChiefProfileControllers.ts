@@ -588,6 +588,32 @@ class ChiefProfileController {
     }
   }
 
+  async getConfig(req:Request, res:Response) {
+    try {
+      const PlatformConfigServices = (await import("../Services/PlatformConfigServices")).default;
+      const result = await PlatformConfigServices.getConfig();
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(500).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  async updateConfig(req:Request, res:Response) {
+    try {
+      const PlatformConfigServices = (await import("../Services/PlatformConfigServices")).default;
+      const result = await PlatformConfigServices.updateConfig(req.body);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
 }
 
 export default new ChiefProfileController();
