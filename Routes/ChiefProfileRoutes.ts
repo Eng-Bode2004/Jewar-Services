@@ -13,6 +13,9 @@ router.post("/", ShopOwnerProfileControllers.create);
 // Get all profiles (protected, maybe only Admin or Manager)
 router.get("/", ShopOwnerProfileControllers.getAll);
 
+// Get all profiles for a specific user by auth_id (multi-shop support)
+router.get("/by-auth/:authId", ShopOwnerProfileControllers.getByAuthId);
+
 // Get profile by ID (protected, anyone logged in can view)
 router.get("/:id", ShopOwnerProfileControllers.getById);
 
