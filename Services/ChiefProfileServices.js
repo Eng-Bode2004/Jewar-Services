@@ -156,19 +156,7 @@ class ChiefProfileService {
             await db.collection('preferreddishchiefs').deleteMany(both('chief_id'));
             await db.collection('dailydishavailabilities').deleteMany(both('chief_id'));
             await db.collection('orders').deleteMany(both('chef_id'));
-            // auth_id is a plain string on this schema
-            // Only delete the user if they have NO other shop profiles
-            if (profile.auth_id) {
-                const otherShops = await ShopOwnerProfileSchema.countDocuments({
-                    auth_id: profile.auth_id,
-                    _id: { $ne: profile._id }
-                });
-                if (otherShops === 0) {
-                    let uid = null;
-                    try { uid = new mongoose.Types.ObjectId(String(profile.auth_id)); } catch (_) {}
-                    if (uid) await db.collection('users').deleteOne({ _id: uid });
-                }
-            }
+            // Do NOT delete the user account — user deletion belongs to User-Service cascade delete.
             await db.collection('addresses').deleteMany({ Profile_id: new mongoose.Types.ObjectId(sidStr) });
             await ShopOwnerProfileSchema.findByIdAndDelete(profileId);
 
