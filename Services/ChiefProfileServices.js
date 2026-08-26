@@ -816,7 +816,7 @@ class ChiefProfileService {
       // City filtering: fetch driver's primary address to determine city
       if (driverId && !driverCity) {
         try {
-          const addrRes = await fetch(`http://localhost:5005/?Profile_id=${driverId}`, { headers: { "Content-Type": "application/json" } });
+          const addrRes = await fetch(`${ADDRESS_SERVICE_URL}/?Profile_id=${driverId}`, { headers: { "Content-Type": "application/json" } });
           if (addrRes.ok) {
             const addrData = await addrRes.json();
             const addresses = addrData.addresses || addrData.data || [];
@@ -982,7 +982,36 @@ class ChiefProfileService {
   async getDriverOrders(driverId) {
     try {
       const orders = await OrderSchema.find({ driver_id: driverId }).sort({ createdAt: -1 });
-      return { status: "success", orders };
+      const enriched = await Promise.all(orders.map(async (order) => {
+        const o = order.toObject();
+        if (o.chef_id) {
+          try {
+            const chef = await ShopOwnerProfileSchema.findById(o.chef_id).select("name phone shop_address profile_image shop_cover");
+            if (chef) {
+              o.chef_name = chef.name;
+              o.chef_phone = chef.phone;
+              o.chef_address = chef.shop_address || "";
+              o.chef_image = chef.shop_cover || chef.profile_image || "";
+            }
+          } catch (_) {}
+        }
+        if (o.customer_id) {
+          try {
+            const custRes = await fetch(`${CUSTOMER_SERVICE_URL}/auth/${o.customer_id}`, {
+              headers: { "Content-Type": "application/json" }
+            });
+            if (custRes.ok) {
+              const custData = await custRes.json();
+              const cust = custData.profile || custData.response || custData;
+              o.customer_phone = cust.phone || "";
+              o.customer_email = cust.email || "";
+              o.customer_avatar = cust.avatar || "";
+            }
+          } catch (_) {}
+        }
+        return o;
+      }));
+      return { status: "success", orders: enriched };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch driver orders");
     }
