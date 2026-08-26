@@ -36,6 +36,12 @@ const DishSchema = new mongoose.Schema({
     french_optional: [{ type: String, trim: true }],
     chinese_optional: [{ type: String, trim: true }],
 
+    // ── Extras / Add-ons ──
+    extras: [{
+        name: { type: String, default: "" },
+        price: { type: Number, default: 0, min: 0 },
+    }],
+
     // ── Relations ──
     Subcategory_id: {
         type: mongoose.Schema.Types.ObjectId,
