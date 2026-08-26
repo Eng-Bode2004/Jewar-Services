@@ -4,7 +4,7 @@ class PaymentProviderService {
 
     // ➤ Create Payment Provider
     async createProvider(data) {
-        const { name, Provider, type } = data;
+        const { name, Provider, type, key } = data;
 
         if (!name || !Provider || !type) throw new Error("All fields are required");
 
