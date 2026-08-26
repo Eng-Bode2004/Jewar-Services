@@ -397,6 +397,19 @@ class ChiefProfileController {
     }
   }
 
+  async updateDeliveryStep(req:Request, res:Response) {
+    try {
+      const { driver_id, step } = req.body;
+      const result = await ChiefProfileServices.updateDeliveryStep(req.params.id, driver_id, step);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
   async settleChefEarnings(req:Request, res:Response) {
     try {
       const result = await ChiefProfileServices.settleChefEarnings(req.params.id);

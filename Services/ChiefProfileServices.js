@@ -782,6 +782,7 @@ class ChiefProfileService {
     try {
       // Only online + verified drivers may see the order pool.
       let driverRating = 0;
+      let driverCity = null;
       if (driverId) {
         let eligible = true;
         try {
@@ -791,6 +792,11 @@ class ChiefProfileService {
             const driver = dData.profile || dData.driver || dData;
             if (!driver.online_status || !driver.Is_Verified) eligible = false;
             driverRating = driver.rating || 0;
+            // Extract driver city from payment_method or use current_location city lookup
+            // We'll use the driver's location to filter orders by matching delivery_address.city
+            if (driver.current_location) {
+              // We'll filter after enrichment instead of at query level
+            }
           } else {
             eligible = false;
           }
@@ -806,8 +812,22 @@ class ChiefProfileService {
         const cutoff = new Date(Date.now() - 30 * 1000);
         baseQuery.createdAt = { $lte: cutoff };
       }
+
+      // City filtering: fetch driver's primary address to determine city
+      if (driverId && !driverCity) {
+        try {
+          const addrRes = await fetch(`http://localhost:5005/?Profile_id=${driverId}`, { headers: { "Content-Type": "application/json" } });
+          if (addrRes.ok) {
+            const addrData = await addrRes.json();
+            const addresses = addrData.addresses || addrData.data || [];
+            const primary = addresses.find((a) => a.is_primary) || addresses[0];
+            if (primary) driverCity = primary.city || primary.governorate || null;
+          }
+        } catch (_) {}
+      }
+
       const orders = await OrderSchema.find(baseQuery).sort({ createdAt: -1 });
-      const enriched = await Promise.all(orders.map(async (order) => {
+      let enriched = await Promise.all(orders.map(async (order) => {
         const o = order.toObject();
         // Enrich chef details
         if (o.chef_id) {
@@ -817,6 +837,11 @@ class ChiefProfileService {
             o.chef_phone = chef.phone;
             o.chef_address = chef.shop_address || "";
             o.chef_image = chef.shop_cover || chef.profile_image || "";
+            // Extract chef city from shop_address
+            if (chef.shop_address && !o.chef_city) {
+              const addrParts = (typeof chef.shop_address === "string" ? chef.shop_address : "").split(",");
+              o.chef_city = addrParts.length > 1 ? addrParts[addrParts.length - 1].trim() : null;
+            }
           }
         }
         // Enrich customer details
@@ -836,6 +861,18 @@ class ChiefProfileService {
         }
         return o;
       }));
+
+      // City-based filtering: only show orders whose delivery address city matches driver's city
+      if (driverCity) {
+        const normalizedDriverCity = driverCity.toLowerCase().trim();
+        enriched = enriched.filter((o) => {
+          const orderCity = (o.delivery_address?.city || "").toLowerCase().trim();
+          const chefCity = (o.chef_city || "").toLowerCase().trim();
+          // Show order if it matches driver's city OR chef is in driver's city
+          return orderCity === normalizedDriverCity || chefCity === normalizedDriverCity;
+        });
+      }
+
       return { status: "success", orders: enriched };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch available orders for driver");
@@ -997,6 +1034,26 @@ class ChiefProfileService {
       return { status: "success", order, breakdown: { foodTotal: order.total, appFee, driverFee, chefEarnings } };
     } catch (error) {
       throw new Error(error.message || "Failed to deliver order");
+    }
+  }
+
+  async updateDeliveryStep(orderId, driverId, step) {
+    try {
+      const validSteps = ["accepted", "picked_up", "in_transit", "delivered"];
+      if (!validSteps.includes(step)) throw new Error("Invalid delivery step");
+
+      const order = await OrderSchema.findOne({ _id: orderId, driver_id: driverId });
+      if (!order) throw new Error("Order not found or not assigned to this driver");
+
+      order.delivery_step = step;
+      if (step === "delivered") {
+        order.order_status = "completed";
+      }
+      await order.save();
+
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to update delivery step");
     }
   }
 

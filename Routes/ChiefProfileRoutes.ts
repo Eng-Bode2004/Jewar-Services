@@ -104,6 +104,9 @@ router.patch("/order/:id/accept", ShopOwnerProfileControllers.acceptOrder);
 // Chef: update order status (preparing / ready / completed / cancelled)
 router.patch("/order/:id/status", ShopOwnerProfileControllers.updateOrderStatus);
 
+// Driver: update delivery step (accepted / picked_up / in_transit / delivered)
+router.patch("/order/:id/delivery-step", ShopOwnerProfileControllers.updateDeliveryStep);
+
 // Chef: get earnings summary (completed orders, 10% fee)
 router.get("/order/chef/:chefId/earnings", ShopOwnerProfileControllers.getChefEarnings);
 
