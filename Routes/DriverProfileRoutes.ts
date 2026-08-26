@@ -7,6 +7,7 @@ router.post("/", DriverProfileController.createProfile);
 router.get("/", DriverProfileController.getAllProfiles);
 router.get("/available", DriverProfileController.getAvailableDrivers);
 router.get("/:id", DriverProfileController.getProfileById);
+router.get("/:id/location", DriverProfileController.getLocation);
 router.get("/auth/:authId", DriverProfileController.getByAuthId);
 router.put("/:id", DriverProfileController.updateProfile);
 router.delete("/:id", DriverProfileController.deleteProfile);

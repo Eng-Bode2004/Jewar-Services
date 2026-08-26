@@ -21,6 +21,16 @@ class DriverProfileService {
         }
     }
 
+    async getLocation(profileId) {
+        try {
+            const profile = await DriverProfileModel.findById(profileId).select("current_location name phone");
+            if (!profile) throw new Error("Profile not found");
+            return { status: "success", location: profile.current_location || null, name: profile.name, phone: profile.phone };
+        } catch (error) {
+            throw new Error(error.message || "Failed to fetch driver location");
+        }
+    }
+
     async getByAuthId(authId) {
         try {
             const profile = await DriverProfileModel.findOne({ auth_id: authId });

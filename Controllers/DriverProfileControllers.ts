@@ -20,6 +20,15 @@ class DriverProfileController {
         }
     }
 
+    async getLocation(req: any, res: any) {
+        try {
+            const result = await DriverProfileService.getLocation(req.params.id);
+            res.status(200).json(result);
+        } catch (error: any) {
+            res.status(404).json({ status: "error", message: error.message });
+        }
+    }
+
     async getByAuthId(req: any, res: any) {
          try {
              const result = await DriverProfileService.getByAuthId(req.params.authId);
