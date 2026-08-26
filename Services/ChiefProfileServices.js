@@ -1,6 +1,7 @@
 import ShopOwnerProfileSchema from "../Models/ShopOwnerProfileSchema.js";
 import OrderSchema from "../Models/OrderSchema.js";
 import AdSchema from "../Models/AdSchema.js";
+import PlatformConfigSchema from "../Models/PlatformConfigSchema.js";
 import mongoose from "mongoose";
 
 const DailyDishAvailabilitySchema = new mongoose.Schema({
@@ -660,6 +661,9 @@ class ChiefProfileService {
 
   async getChefEarnings(chefId) {
     try {
+      const config = await PlatformConfigSchema.getConfig();
+      const appFeePercent = config.app_fee_percent ?? 10;
+
       const orders = await OrderSchema.find({
         chef_id: chefId,
         transaction_status: "approved",
@@ -667,7 +671,7 @@ class ChiefProfileService {
       }).sort({ createdAt: -1 });
 
       const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
-      const appFee = totalRevenue * 0.1;
+      const appFee = totalRevenue * (appFeePercent / 100);
       const netEarnings = totalRevenue - appFee;
 
       const dailyTotals = {};
@@ -699,7 +703,7 @@ class ChiefProfileService {
       weekStart.setDate(weekStart.getDate() - weekStart.getDay());
       const weekOrders = orders.filter((o) => o.createdAt && new Date(o.createdAt) >= weekStart);
       const weekRevenue = weekOrders.reduce((s, o) => s + (o.total || 0), 0);
-      const weekFee = weekRevenue * 0.1;
+      const weekFee = weekRevenue * (appFeePercent / 100);
       const weekNet = weekRevenue - weekFee;
       const prevWeekOrders = orders.filter(
         (o) => o.createdAt && new Date(o.createdAt) < weekStart && new Date(o.createdAt) >= new Date(weekStart.getTime() - 7 * 86400000)
@@ -938,7 +942,20 @@ class ChiefProfileService {
       if (!order) throw new Error("Order not found");
       if (order.order_status === "completed") throw new Error("Order already completed");
       
+      // Fetch platform config for fee calculations.
+      const config = await PlatformConfigSchema.getConfig();
+      const appFeePercent = config.app_fee_percent ?? 10;
+      const defaultDeliveryFee = config.default_delivery_fee ?? 15;
+
+      // Use the negotiated delivery fee if available, otherwise the default.
+      const driverFee = order.agreed_delivery_fee ?? order.delivery_fee ?? defaultDeliveryFee;
+
+      // Apply the app fee percentage on the food total.
+      const appFee = order.total * (appFeePercent / 100);
+      const chefEarnings = order.total - appFee;
+
       order.order_status = "completed";
+      order.delivery_fee = driverFee;
       await order.save();
 
       // Update chef earnings
@@ -946,7 +963,6 @@ class ChiefProfileService {
          const chef = await ShopOwnerProfileSchema.findById(order.chef_id);
          if (chef) {
              if(!chef.earnings) chef.earnings = { total: 0, this_week: 0, pending: 0 };
-             const chefEarnings = order.total - 15; // 15 is driver fee
              chef.earnings.pending += Math.max(0, chefEarnings);
              await chef.save();
          }
@@ -958,12 +974,12 @@ class ChiefProfileService {
             await fetch(`${DRIVER_SERVICE_URL}/${order.driver_id}/earnings`, {
                method: "PATCH",
                headers: { "Content-Type": "application/json" },
-               body: JSON.stringify({ amount: 15 })
+               body: JSON.stringify({ amount: driverFee })
             });
          } catch (_) {}
       }
 
-      return { status: "success", order };
+      return { status: "success", order, breakdown: { foodTotal: order.total, appFee, driverFee, chefEarnings } };
     } catch (error) {
       throw new Error(error.message || "Failed to deliver order");
     }

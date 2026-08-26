@@ -150,5 +150,9 @@ router.patch("/ad/:id", ShopOwnerProfileControllers.updateAd);
 // Delete ad
 router.delete("/ad/:id", ShopOwnerProfileControllers.deleteAd);
 
+// ── Platform Config ──────────────────────────────────────
+router.get("/config", ShopOwnerProfileControllers.getConfig);
+router.patch("/config", ShopOwnerProfileControllers.updateConfig);
+
 export default router;
 
