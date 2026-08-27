@@ -830,23 +830,18 @@ class ChiefProfileService {
         if (!eligible) return { status: "success", orders: [] };
       }
 
-      // Rating-based priority: top drivers (rating >= 4.0) see the full order pool
-      // immediately, while lower-rated drivers only see orders older than 30 seconds,
-      // giving high-rated drivers a head start on new orders.
-      // Pool contents: orders that need a driver are either `ready`, OR whole-order
-      // online orders that are still being prepared at the shop (so drivers can bid
-      // on them ahead of pickup). Cash orders stay at the shop only.
+      // The pool shows EVERY open order that still needs a driver: all
+      // non-terminal orders (pending / accepted / preparing / ready) with no
+      // driver assigned yet. Orders already assigned to a driver, or already in
+      // delivery / completed / cancelled, are excluded.
       const baseQuery = {
-        order_status: { $nin: ["cancelled", "completed"] },
-        $or: [{ driver_id: { $exists: false } }, { driver_id: null }],
-        $and: [
-          { $or: [{ order_status: "ready" }, { delivery_payment_method: "online" }] },
+        order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
+        $or: [
+          { driver_id: { $exists: false } },
+          { driver_id: null },
+          { driver_id: "" },
         ],
       };
-      if (driverRating < 4) {
-        const cutoff = new Date(Date.now() - 30 * 1000);
-        baseQuery.createdAt = { $lte: cutoff };
-      }
 
       // City filtering: fetch driver's primary address to determine city
       if (driverId && !driverCity) {
@@ -897,26 +892,8 @@ class ChiefProfileService {
         return o;
       }));
 
-      // City-based filtering: only show orders whose delivery address city matches driver's city.
-      // Whole-order ONLINE payments are matched by intent — the customer already committed to the
-      // order online — so they are shown to every eligible driver regardless of the fragile
-      // saved-city string (the driver's live GPS can't be compared to an order's city text either).
-      // Only `ready`-pool orders keep city matching.
-      if (driverCity) {
-        const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, "").trim();
-        const normalizedDriverCity = norm(driverCity);
-        enriched = enriched.filter((o) => {
-          if (o.delivery_payment_method === "online") return true;
-          const orderCity = norm(o.delivery_address?.city);
-          const chefCity = norm(o.chef_city);
-          // Show order if the driver city matches the order's delivery city OR
-          // the chef's city (containment both ways tolerates sub-city differences).
-          return (
-            (orderCity && (orderCity === normalizedDriverCity || orderCity.includes(normalizedDriverCity) || normalizedDriverCity.includes(orderCity))) ||
-            (chefCity && (chefCity === normalizedDriverCity || chefCity.includes(normalizedDriverCity) || normalizedDriverCity.includes(chefCity)))
-          );
-        });
-      }
+      // NOTE: no city-based filtering is applied — every open unassigned order
+      // is shown so the driver sees all the orders that were made.
 
       return { status: "success", orders: enriched };
     } catch (error) {
@@ -941,8 +918,20 @@ class ChiefProfileService {
           if (e && e.message && e.message.includes("activation")) throw e;
         }
       }
+      // Cap the number of simultaneous active deliveries per driver (max 3).
+      const activeCount = await OrderSchema.countDocuments({
+        driver_id: driverId,
+        order_status: { $nin: ["completed", "cancelled", "delivered", ""] },
+      });
+      if (activeCount >= 3) {
+        throw new Error("You already have 3 active deliveries. Complete one before accepting more.");
+      }
       const order = await OrderSchema.findOneAndUpdate(
-        { _id: orderId, driver_id: { $exists: false }, order_status: "ready" },
+        {
+          _id: orderId,
+          order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
+          $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }],
+        },
         { driver_id: driverId, order_status: "out_for_delivery" },
         { new: true }
       );
