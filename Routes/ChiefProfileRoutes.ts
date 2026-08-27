@@ -98,6 +98,9 @@ router.patch("/order/:id", ShopOwnerProfileControllers.updateOrder);
 // Admin: verify/reject payment for an order
 router.patch("/order/:id/payment-verify", ShopOwnerProfileControllers.verifyPayment);
 
+// Shop owner: verify/reject a CUSTOMER's payment receipt for their order
+router.patch("/order/:id/shop-payment-verify", ShopOwnerProfileControllers.shopVerifyPayment);
+
 // Chef: accept an order
 router.patch("/order/:id/accept", ShopOwnerProfileControllers.acceptOrder);
 
