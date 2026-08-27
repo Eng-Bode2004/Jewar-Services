@@ -372,6 +372,19 @@ class ChiefProfileController {
     }
   }
 
+  async shopVerifyPayment(req:Request, res:Response) {
+    try {
+      const { status, chef_id } = req.body;
+      const result = await ChiefProfileServices.shopVerifyPayment(req.params.id, chef_id, status);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
   async acceptOrder(req:Request, res:Response) {
     try {
       const result = await ChiefProfileServices.acceptOrder(req.params.id);

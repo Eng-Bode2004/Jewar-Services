@@ -617,6 +617,32 @@ class ChiefProfileService {
     }
   }
 
+  /// Shop-owner verification of a CUSTOMER's payment receipt. Only the shop
+  /// that owns the order (chef_id) may approve/reject it. The customer's app
+  /// leaves the transfer pending until the shop confirms it here.
+  async shopVerifyPayment(orderId, chefId, status) {
+    try {
+      if (!chefId) throw new Error("Missing shop id");
+      if (!["approved", "rejected"].includes(status)) {
+        throw new Error("Status must be 'approved' or 'rejected'");
+      }
+      const order = await OrderSchema.findOne({ _id: orderId, chef_id: chefId });
+      if (!order) throw new Error("Order not found for this shop");
+      const update = { transaction_status: status };
+      if (status === "rejected") {
+        update.order_status = "cancelled";
+      } else {
+        update.order_status = order.order_status && order.order_status !== "pending"
+          ? order.order_status
+          : "accepted";
+      }
+      const updated = await OrderSchema.findByIdAndUpdate(orderId, update, { new: true });
+      return { status: "success", order: updated };
+    } catch (error) {
+      throw new Error(error.message || "Failed to verify payment");
+    }
+  }
+
   async acceptOrder(orderId) {
     try {
       const order = await OrderSchema.findByIdAndUpdate(
