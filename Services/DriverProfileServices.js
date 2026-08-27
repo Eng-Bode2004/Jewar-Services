@@ -238,13 +238,24 @@ class DriverProfileService {
         }
     }
 
-    async updateEarnings(profileId, amount) {
+    async updateEarnings(profileId, amount, platformFee = 0, balanceThreshold = null) {
          try {
-             const updated = await DriverProfileModel.findByIdAndUpdate(profileId, {
-                 $inc: { "earnings.total": amount, "earnings.this_week": amount, "earnings.pending": amount, total_deliveries: 1 }
-             }, { new: true });
-             if (!updated) throw new Error("Profile not found");
-             return { status: "success", earnings: updated.earnings };
+             const profile = await DriverProfileModel.findById(profileId);
+             if (!profile) throw new Error("Profile not found");
+
+             profile.earnings.total += amount;
+             profile.earnings.this_week += amount;
+             profile.earnings.pending += amount;
+             profile.total_deliveries += 1;
+             if (platformFee) profile.platform_balance += platformFee;
+
+             // Auto-suspend when the platform balance falls below the threshold.
+             if (balanceThreshold !== null && profile.platform_balance < balanceThreshold) {
+                 profile.Is_Active = false;
+             }
+             await profile.save();
+
+             return { status: "success", earnings: profile.earnings, platform_balance: profile.platform_balance };
          } catch (error) {
              throw new Error(error.message || "Failed to update earnings");
          }

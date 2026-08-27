@@ -137,8 +137,8 @@ class DriverProfileController {
 
     async updateEarnings(req: any, res: any) {
         try {
-            const { amount } = req.body;
-            const result = await DriverProfileService.updateEarnings(req.params.id, amount);
+            const { amount, platformFee, balanceThreshold } = req.body;
+            const result = await DriverProfileService.updateEarnings(req.params.id, amount, platformFee || 0, balanceThreshold !== undefined ? balanceThreshold : null);
             res.status(200).json(result);
         } catch (error: any) {
             res.status(400).json({ status: "error", message: error.message });

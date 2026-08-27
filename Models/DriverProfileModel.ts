@@ -124,6 +124,12 @@ const DriverProfileSchema = new mongoose.Schema({
         pending: { type: Number, default: 0 },
     },
 
+    // Tracked platform balance (EGP) used for the auto-suspend threshold check.
+    platform_balance: {
+        type: Number,
+        default: 0,
+    },
+
     online_status: {
         type: Boolean,
         default: false,
