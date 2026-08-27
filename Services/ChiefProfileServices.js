@@ -871,11 +871,16 @@ class ChiefProfileService {
         return o;
       }));
 
-      // City-based filtering: only show orders whose delivery address city matches driver's city
+      // City-based filtering: only show orders whose delivery address city matches driver's city.
+      // Whole-order ONLINE payments are matched by intent — the customer already committed to the
+      // order online — so they are shown to every eligible driver regardless of the fragile
+      // saved-city string (the driver's live GPS can't be compared to an order's city text either).
+      // Only `ready`-pool orders keep city matching.
       if (driverCity) {
         const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, "").trim();
         const normalizedDriverCity = norm(driverCity);
         enriched = enriched.filter((o) => {
+          if (o.delivery_payment_method === "online") return true;
           const orderCity = norm(o.delivery_address?.city);
           const chefCity = norm(o.chef_city);
           // Show order if the driver city matches the order's delivery city OR
