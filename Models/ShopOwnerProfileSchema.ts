@@ -107,6 +107,19 @@ const ShopOwnerProfileSchema = new mongoose.Schema({
         default: true,
     },
 
+    // Whether the shop account is active/suspended. Auto-suspended when the
+    // platform balance falls below the configured balance_threshold.
+    Is_Active: {
+        type: Boolean,
+        default: true,
+    },
+
+    // Tracked platform balance (EGP) used for the auto-suspend threshold check.
+    platform_balance: {
+        type: Number,
+        default: 0,
+    },
+
     shop_address: {
         type: String,
     },

@@ -514,6 +514,40 @@ class ChiefProfileController {
     }
   }
 
+  async driverCashHandoff(req:Request, res:Response) {
+    try {
+      const { driver_id } = req.body;
+      const result = await ChiefProfileServices.driverCashHandoff(req.params.id, driver_id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      const e = error as Error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
+
+  async driverOnlineTransfer(req:Request, res:Response) {
+    try {
+      const { driver_id, image } = req.body;
+      const result = await ChiefProfileServices.driverOnlineTransfer(req.params.id, driver_id, image);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      const e = error as Error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
+
+  async shopConfirmDriverPayment(req:Request, res:Response) {
+    try {
+      const { chef_id } = req.body;
+      const result = await ChiefProfileServices.shopConfirmDriverPayment(req.params.id, chef_id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      const e = error as Error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
+
+
   async getDriverOrders(req:Request, res:Response) {
     try {
       const result = await ChiefProfileServices.getDriverOrders(req.params.driverId);

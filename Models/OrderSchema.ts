@@ -51,6 +51,21 @@ const OrderSchema = new mongoose.Schema({
     enum: ["none", "accepted", "picked_up", "in_transit", "delivered"],
     default: "none",
   },
+  // How the driver settled the collected delivery fee with the shop.
+  // - method: "cash" (handed cash at shop) or "online" (transferred online)
+  // - status: "none" | "cash_handed" | "transfer_pending" | "confirmed"
+  driver_delivery_payment: {
+    method: { type: String, enum: ["cash", "online"], default: "cash" },
+    status: {
+      type: String,
+      enum: ["none", "cash_handed", "transfer_pending", "confirmed"],
+      default: "none",
+    },
+    amount: { type: Number, default: 0 },
+    // Receipt image URL when the driver transfers online to the shop.
+    image: { type: String },
+    confirmed_at: { type: Date },
+  },
   delivery_address: {
     street: String,
     city: String,

@@ -136,6 +136,16 @@ router.patch("/order/:id/delivery-offer/respond", ShopOwnerProfileControllers.re
 // Driver: deliver an order
 router.patch("/order/:id/driver-deliver", ShopOwnerProfileControllers.deliverOrderDriver);
 
+// Driver: report handing the collected cash delivery fee to the shop
+router.patch("/order/:id/driver-cash-handoff", ShopOwnerProfileControllers.driverCashHandoff);
+
+// Driver: report an online transfer to the shop with a receipt image
+router.patch("/order/:id/driver-online-transfer", ShopOwnerProfileControllers.driverOnlineTransfer);
+
+// Shop: confirm receipt of the driver's cash handoff or online transfer
+router.patch("/order/:id/shop-confirm-payment", ShopOwnerProfileControllers.shopConfirmDriverPayment);
+
+
 // Customer: rate order and driver after completion
 router.post("/order/:id/rate", ShopOwnerProfileControllers.rateOrder);
 

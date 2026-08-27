@@ -986,12 +986,18 @@ class ChiefProfileService {
         const o = order.toObject();
         if (o.chef_id) {
           try {
-            const chef = await ShopOwnerProfileSchema.findById(o.chef_id).select("name phone shop_address profile_image shop_cover");
+            const chef = await ShopOwnerProfileSchema.findById(o.chef_id).select("name phone shop_address profile_image shop_cover Payment_Method");
             if (chef) {
               o.chef_name = chef.name;
               o.chef_phone = chef.phone;
               o.chef_address = chef.shop_address || "";
               o.chef_image = chef.shop_cover || chef.profile_image || "";
+              if (chef.Payment_Method) {
+                o.chef_payment_method = {
+                  provider: chef.Payment_Method.provider || "",
+                  details: chef.Payment_Method.details || "",
+                };
+              }
             }
           } catch (_) {}
         }
@@ -1025,42 +1031,53 @@ class ChiefProfileService {
       
       // Fetch platform config for fee calculations.
       const config = await PlatformConfigSchema.getConfig();
-      const appFeePercent = config.app_fee_percent ?? 10;
+      const balanceThreshold = config.balance_threshold ?? 0;
+      const shopFeePercent = config.shop_fee_percent ?? config.app_fee_percent ?? 10;
+      const driverFeePercent = config.driver_fee_percent ?? 0;
       const defaultDeliveryFee = config.default_delivery_fee ?? 15;
 
       // Use the negotiated delivery fee if available, otherwise the default.
       const driverFee = order.agreed_delivery_fee ?? order.delivery_fee ?? defaultDeliveryFee;
 
-      // Apply the app fee percentage on the food total.
-      const appFee = order.total * (appFeePercent / 100);
-      const chefEarnings = order.total - appFee;
+      // Apply the shop app fee percentage on the food total.
+      const shopAppFee = order.total * (shopFeePercent / 100);
+      const chefEarnings = order.total - shopAppFee;
+
+      // Apply the driver app fee percentage on the delivery fee (driver collects it).
+      const driverAppFee = driverFee * (driverFeePercent / 100);
+      const driverNet = driverFee - driverAppFee;
 
       order.order_status = "completed";
       order.delivery_fee = driverFee;
       await order.save();
 
-      // Update chef earnings
+      // Update chef earnings + track platform balance, apply auto-suspend.
       if (order.chef_id) {
          const chef = await ShopOwnerProfileSchema.findById(order.chef_id);
          if (chef) {
              if(!chef.earnings) chef.earnings = { total: 0, this_week: 0, pending: 0 };
              chef.earnings.pending += Math.max(0, chefEarnings);
+             chef.platform_balance = (chef.platform_balance || 0) + shopAppFee;
+             if (chef.platform_balance < balanceThreshold) {
+                 chef.Is_Active = false;
+             }
              await chef.save();
          }
       }
 
-      // Update driver earnings via API call
+      // Update driver earnings via API call (net after app fee) + track the
+      // driver's platform fee so the driver-service can apply its own threshold.
       if (order.driver_id) {
          try {
             await fetch(`${DRIVER_SERVICE_URL}/${order.driver_id}/earnings`, {
                method: "PATCH",
                headers: { "Content-Type": "application/json" },
-               body: JSON.stringify({ amount: driverFee })
+               body: JSON.stringify({ amount: driverNet, platformFee: driverAppFee, balanceThreshold })
             });
          } catch (_) {}
       }
 
-      return { status: "success", order, breakdown: { foodTotal: order.total, appFee, driverFee, chefEarnings } };
+      return { status: "success", order, breakdown: { foodTotal: order.total, shopAppFee, driverAppFee, driverNet, driverFee, chefEarnings } };
     } catch (error) {
       throw new Error(error.message || "Failed to deliver order");
     }
@@ -1083,6 +1100,74 @@ class ChiefProfileService {
       return { status: "success", order };
     } catch (error) {
       throw new Error(error.message || "Failed to update delivery step");
+    }
+  }
+
+  // Driver hands the collected cash delivery fee to the shop in person.
+  // The shop must confirm receipt before the driver is cleared.
+  async driverCashHandoff(orderId, driverId) {
+    try {
+      const order = await OrderSchema.findOne({ _id: orderId, driver_id: driverId });
+      if (!order) throw new Error("Order not found or not assigned to this driver");
+
+      const amount = order.agreed_delivery_fee ?? order.delivery_fee ?? 0;
+      order.driver_delivery_payment = {
+        method: "cash",
+        status: "cash_handed",
+        amount,
+        image: order.driver_delivery_payment?.image || "",
+        confirmed_at: null,
+      };
+      await order.save();
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to record cash handoff");
+    }
+  }
+
+  // Driver transfers the delivery fee online to the shop's payment method and
+  // uploads a receipt image. The shop must confirm the receipt.
+  async driverOnlineTransfer(orderId, driverId, image) {
+    try {
+      const order = await OrderSchema.findOne({ _id: orderId, driver_id: driverId });
+      if (!order) throw new Error("Order not found or not assigned to this driver");
+      if (!image) throw new Error("Receipt image is required");
+
+      const amount = order.agreed_delivery_fee ?? order.delivery_fee ?? 0;
+      order.driver_delivery_payment = {
+        method: "online",
+        status: "transfer_pending",
+        amount,
+        image,
+        confirmed_at: null,
+      };
+      await order.save();
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to record online transfer");
+    }
+  }
+
+  // Shop confirms receipt of the driver's cash handoff or online transfer.
+  async shopConfirmDriverPayment(orderId, chefId) {
+    try {
+      const order = await OrderSchema.findOne({ _id: orderId, chef_id: chefId });
+      if (!order) throw new Error("Order not found or not assigned to this shop");
+
+      if (!order.driver_delivery_payment ||
+          order.driver_delivery_payment.status === "none") {
+        throw new Error("Driver has not reported any settlement yet");
+      }
+      if (order.driver_delivery_payment.status === "confirmed") {
+        throw new Error("Driver payment already confirmed");
+      }
+
+      order.driver_delivery_payment.status = "confirmed";
+      order.driver_delivery_payment.confirmed_at = new Date();
+      await order.save();
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to confirm driver payment");
     }
   }
 
