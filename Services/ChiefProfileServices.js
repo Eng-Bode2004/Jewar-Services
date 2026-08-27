@@ -2,6 +2,7 @@ import ShopOwnerProfileSchema from "../Models/ShopOwnerProfileSchema.js";
 import OrderSchema from "../Models/OrderSchema.js";
 import AdSchema from "../Models/AdSchema.js";
 import PlatformConfigSchema from "../Models/PlatformConfigSchema.js";
+import ChatSchema from "../Models/ChatSchema.js";
 import mongoose from "mongoose";
 
 const DailyDishAvailabilitySchema = new mongoose.Schema({
@@ -30,6 +31,137 @@ const REQUIRED_VERIFICATION_STEPS = [
     "Tax_Card_Status",
     "Payment_Method_Status",
 ];
+
+// Fetch the primary saved AddressService location (lat/lng + full text) for a
+// Profile_id. Used to give drivers the shop + customer coordinates and full
+// text addresses so they can see both locations on a map in order details.
+async function fetchAddressLocation(profileId) {
+    if (!profileId) return null;
+    try {
+        const addrRes = await fetch(`${ADDRESS_SERVICE_URL}/?Profile_id=${profileId}`, { headers: { "Content-Type": "application/json" } });
+        if (!addrRes.ok) return null;
+        const addrData = await addrRes.json();
+        const addrs = addrData?.addresses ?? addrData?.data ?? [];
+        const primary = addrs.find((a) => a.is_primary) || addrs[0];
+        if (!primary) return null;
+        const lat = Number(primary.latitude);
+        const lng = Number(primary.longitude);
+        const parts = [
+            primary.street,
+            primary.building_Number,
+            primary.city,
+            primary.governorate,
+        ].filter((p) => p && String(p).trim() !== "");
+        return {
+            latitude: Number.isFinite(lat) ? lat : null,
+            longitude: Number.isFinite(lng) ? lng : null,
+            full_text: parts.join(", "),
+        };
+    } catch (_) {
+        return null;
+    }
+}
+
+// Fetch a single enriched copy of an order for client UIs. Adds the contact
+// details of every party (shop / customer / driver) plus full text addresses
+// (via AddressService) so drivers, shop owners and customers can reach each
+// other directly. Safe to call on toObject()-style order representations.
+async function enrichOrderForClient(orderDoc) {
+    const o = orderDoc && orderDoc.toObject ? orderDoc.toObject() : orderDoc;
+    if (!o) return o;
+
+    // ── Shop (chef) details ──────────────────────────────────────────
+    if (o.chef_id) {
+        try {
+            const chef = await ShopOwnerProfileSchema.findById(o.chef_id)
+                .select("name phone shop_address profile_image shop_cover Payment_Method");
+            if (chef) {
+                o.chef_name = chef.name;
+                o.chef_phone = chef.phone || "";
+                o.chef_address = chef.shop_address || "";
+                o.chef_image = chef.shop_cover || chef.profile_image || "";
+                if (chef.Payment_Method) {
+                    o.chef_payment_method = {
+                        provider: chef.Payment_Method.provider || "",
+                        details: chef.Payment_Method.details || "",
+                    };
+                }
+            }
+        } catch (_) {}
+    }
+
+    // ── Customer details ─────────────────────────────────────────────
+    if (o.customer_id) {
+        try {
+            const custRes = await fetch(`${CUSTOMER_SERVICE_URL}/auth/${o.customer_id}`, {
+                headers: { "Content-Type": "application/json" }
+            });
+            if (custRes.ok) {
+                const custData = await custRes.json();
+                const cust = custData.profile || custData.response || custData;
+                o.customer_name = cust.name || cust.full_name || "Customer";
+                o.customer_phone = cust.phone || "";
+                o.customer_email = cust.email || "";
+                o.customer_avatar = cust.avatar || "";
+            }
+        } catch (_) {}
+    }
+
+    // ── Driver details (after a driver is assigned) ──────────────────
+    if (o.driver_id) {
+        try {
+            const dRes = await fetch(`${DRIVER_SERVICE_URL}/${o.driver_id}`, {
+                headers: { "Content-Type": "application/json" }
+            });
+            if (dRes.ok) {
+                const dData = await dRes.json();
+                const driver = dData.profile || dData.driver || dData;
+                o.driver_name = driver.name || driver.full_name || "Driver";
+                o.driver_phone = driver.phone || driver.mobile || "";
+                o.driver_avatar = driver.avatar || "";
+            }
+        } catch (_) {}
+    }
+
+    // ── Full text addresses (shop pickup + customer drop-off) ────────
+    const [shopLoc, custLoc] = await Promise.all([
+        o.chef_id ? fetchAddressLocation(o.chef_id) : Promise.resolve(null),
+        o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null),
+    ]);
+    if (shopLoc) {
+        o.shop_latitude = shopLoc.latitude;
+        o.shop_longitude = shopLoc.longitude;
+        o.shop_full_address = shopLoc.full_text || o.chef_address || "";
+    }
+    if (custLoc) {
+        o.customer_latitude = custLoc.latitude;
+        o.customer_longitude = custLoc.longitude;
+        o.customer_full_address = custLoc.full_text || o.delivery_address?.street || "";
+    }
+    return o;
+}
+
+// Ensure the order's chat has a set of participants. Every role that touches an
+// order must be a participant (customer / chef / driver) so that each side's
+// per-user in-app chat popup poller (getChatsByUser) can find the chat — even
+// before they open the chat screen. $addToSet + upsert keeps it idempotent.
+async function upsertChatParticipants(orderId, participants) {
+    if (!orderId) return;
+    try {
+        const filtered = (participants || []).filter((p) => p && p.id);
+        if (filtered.length === 0) return;
+        await ChatSchema.findOneAndUpdate(
+            { order_id: orderId },
+            {
+                $setOnInsert: { order_id: orderId },
+                $addToSet: { participants: { $each: filtered } },
+            },
+            { upsert: true, new: true }
+        );
+    } catch (_) {
+        // Chat seeding is best-effort; never fail the order because of it.
+    }
+}
 
 class ChiefProfileService {
 
@@ -502,6 +634,16 @@ class ChiefProfileService {
   async createOrder(data) {
     try {
       const order = await OrderSchema.create(data);
+      // Seed the order's chat so the customer and shop are participants from the
+      // start — needed for each side's in-app chat popup poller to work.
+      const participants = [];
+      if (data.customer_id) {
+        participants.push({ id: data.customer_id, role: "customer", name: data.customer_name || "" });
+      }
+      if (data.chef_id) {
+        participants.push({ id: data.chef_id, role: "chef", name: data.chef_name || "" });
+      }
+      await upsertChatParticipants(String(order._id), participants);
       return { status: "success", order };
     } catch (error) {
       throw new Error(error.message || "Failed to create order");
@@ -511,7 +653,8 @@ class ChiefProfileService {
   async getOrdersByChef(chefId) {
     try {
       const orders = await OrderSchema.find({ chef_id: chefId }).sort({ createdAt: -1 });
-      return { status: "success", orders };
+      const enriched = await Promise.all(orders.map((o) => enrichOrderForClient(o)));
+      return { status: "success", orders: enriched };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch chef orders");
     }
@@ -520,7 +663,8 @@ class ChiefProfileService {
   async getOrdersByCustomer(customerId) {
     try {
       const orders = await OrderSchema.find({ customer_id: customerId }).sort({ createdAt: -1 });
-      return { status: "success", orders };
+      const enriched = await Promise.all(orders.map((o) => enrichOrderForClient(o)));
+      return { status: "success", orders: enriched };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch customer orders");
     }
@@ -530,7 +674,8 @@ class ChiefProfileService {
     try {
       const order = await OrderSchema.findById(orderId);
       if (!order) throw new Error("Order not found");
-      return { status: "success", order };
+      const enriched = await enrichOrderForClient(order);
+      return { status: "success", order: enriched };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch order");
     }
@@ -889,6 +1034,21 @@ class ChiefProfileService {
             }
           } catch (_) {}
         }
+        // Attach shop + customer coordinates & full text addresses for the map
+        const [shopLoc, custLoc] = await Promise.all([
+          o.chef_id ? fetchAddressLocation(o.chef_id) : Promise.resolve(null),
+          o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null),
+        ]);
+        if (shopLoc) {
+          o.shop_latitude = shopLoc.latitude;
+          o.shop_longitude = shopLoc.longitude;
+          o.shop_full_address = shopLoc.full_text || o.chef_address || "";
+        }
+        if (custLoc) {
+          o.customer_latitude = custLoc.latitude;
+          o.customer_longitude = custLoc.longitude;
+          o.customer_full_address = custLoc.full_text || o.delivery_address?.street || "";
+        }
         return o;
       }));
 
@@ -903,6 +1063,7 @@ class ChiefProfileService {
 
   async acceptOrderDriver(orderId, driverId) {
     try {
+      let driverName = "";
       // Reject offline / unverified drivers.
       if (driverId) {
         try {
@@ -910,6 +1071,7 @@ class ChiefProfileService {
           if (dRes.ok) {
             const dData = await dRes.json();
             const driver = dData.profile || dData.driver || dData;
+            driverName = driver.name || driver.full_name || "";
             if (!driver.online_status || !driver.Is_Verified) {
               throw new Error("Go online and complete account activation to accept orders");
             }
@@ -932,10 +1094,13 @@ class ChiefProfileService {
           order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
           $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }],
         },
-        { driver_id: driverId, order_status: "out_for_delivery" },
+        { driver_id: driverId, order_status: "accepted", delivery_step: "accepted" },
         { new: true }
       );
       if (!order) throw new Error("Order not available or already accepted by another driver");
+      // Add the driver to the order's chat so the customer and driver can
+      // message each other and both get in-app chat popups.
+      await upsertChatParticipants(String(order._id), [{ id: driverId, role: "driver", name: driverName }]);
       return { status: "success", order };
     } catch (error) {
       throw new Error(error.message || "Failed to accept order for driver");
@@ -1005,7 +1170,9 @@ class ChiefProfileService {
         }
         order.driver_id = offer.driver_id;
         order.agreed_delivery_fee = offer.amount;
-        order.order_status = "out_for_delivery";
+        order.order_status = "accepted";
+        order.delivery_step = "accepted";
+        await upsertChatParticipants(String(order._id), [{ id: offer.driver_id, role: "driver", name: offer.driver_name || "" }]);
       } else {
         offer.status = "rejected";
       }
@@ -1051,6 +1218,21 @@ class ChiefProfileService {
               o.customer_avatar = cust.avatar || "";
             }
           } catch (_) {}
+        }
+        // Attach shop + customer coordinates & full text addresses for the map
+        const [shopLoc, custLoc] = await Promise.all([
+          o.chef_id ? fetchAddressLocation(o.chef_id) : Promise.resolve(null),
+          o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null),
+        ]);
+        if (shopLoc) {
+          o.shop_latitude = shopLoc.latitude;
+          o.shop_longitude = shopLoc.longitude;
+          o.shop_full_address = shopLoc.full_text || o.chef_address || "";
+        }
+        if (custLoc) {
+          o.customer_latitude = custLoc.latitude;
+          o.customer_longitude = custLoc.longitude;
+          o.customer_full_address = custLoc.full_text || o.delivery_address?.street || "";
         }
         return o;
       }));
@@ -1131,6 +1313,10 @@ class ChiefProfileService {
       order.delivery_step = step;
       if (step === "delivered") {
         order.order_status = "completed";
+      } else if (step === "picked_up" || step === "in_transit") {
+        // The driver left the shop with the order; the shop's prep phase is
+        // over and the delivery is now in progress.
+        order.order_status = "out_for_delivery";
       }
       await order.save();
 

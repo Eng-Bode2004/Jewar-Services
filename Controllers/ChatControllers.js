@@ -39,6 +39,15 @@ class ChatControllers {
       res.status(400).json({ status: "error", message: error.message || "Failed" });
     }
   }
+
+  async getChatsByUser(req, res) {
+    try {
+      const result = await ChatServices.getChatsByUser(req.params.userId);
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(400).json({ status: "error", message: error.message || "Failed" });
+    }
+  }
 }
 
 module.exports = new ChatControllers();

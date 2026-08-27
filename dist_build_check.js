@@ -83781,6 +83781,36 @@ var init_PlatformConfigSchema = __esm(() => {
   PlatformConfigSchema_default = import_mongoose5.default.model("PlatformConfig", PlatformConfigSchema);
 });
 
+// Models/ChatSchema.ts
+var exports_ChatSchema = {};
+__export(exports_ChatSchema, {
+  default: () => ChatSchema_default
+});
+var import_mongoose6, MessageSchema, ChatSchema, ChatSchema_default;
+var init_ChatSchema = __esm(() => {
+  import_mongoose6 = __toESM(require_mongoose2(), 1);
+  MessageSchema = new import_mongoose6.default.Schema({
+    sender_id: { type: String, required: true },
+    sender_role: { type: String, enum: ["customer", "driver", "chef"], required: true },
+    text: { type: String, required: true },
+    created_at: { type: Date, default: Date.now }
+  }, { _id: false });
+  ChatSchema = new import_mongoose6.default.Schema({
+    order_id: { type: String, required: true, index: true },
+    participants: {
+      type: [{
+        id: String,
+        role: { type: String, enum: ["customer", "driver", "chef"] },
+        name: String
+      }],
+      required: true
+    },
+    messages: { type: [MessageSchema], default: [] }
+  }, { timestamps: true });
+  ChatSchema.index({ order_id: 1 });
+  ChatSchema_default = import_mongoose6.default.model("Chat", ChatSchema);
+});
+
 // Services/PlatformConfigServices.js
 var exports_PlatformConfigServices = {};
 __export(exports_PlatformConfigServices, {
@@ -83809,36 +83839,6 @@ var init_PlatformConfigServices = __esm(() => {
   PlatformConfigServices_default = new PlatformConfigServices;
 });
 
-// Models/ChatSchema.ts
-var exports_ChatSchema = {};
-__export(exports_ChatSchema, {
-  default: () => ChatSchema_default
-});
-var import_mongoose7, MessageSchema, ChatSchema, ChatSchema_default;
-var init_ChatSchema = __esm(() => {
-  import_mongoose7 = __toESM(require_mongoose2(), 1);
-  MessageSchema = new import_mongoose7.default.Schema({
-    sender_id: { type: String, required: true },
-    sender_role: { type: String, enum: ["customer", "driver", "chef"], required: true },
-    text: { type: String, required: true },
-    created_at: { type: Date, default: Date.now }
-  }, { _id: false });
-  ChatSchema = new import_mongoose7.default.Schema({
-    order_id: { type: String, required: true, index: true },
-    participants: {
-      type: [{
-        id: String,
-        role: { type: String, enum: ["customer", "driver", "chef"] },
-        name: String
-      }],
-      required: true
-    },
-    messages: { type: [MessageSchema], default: [] }
-  }, { timestamps: true });
-  ChatSchema.index({ order_id: 1 });
-  ChatSchema_default = import_mongoose7.default.model("Chat", ChatSchema);
-});
-
 // Services/ChatServices.js
 var require_ChatServices = __commonJS((exports, module) => {
   var Chat = (init_ChatSchema(), __toCommonJS(exports_ChatSchema)).default;
@@ -83849,6 +83849,18 @@ var require_ChatServices = __commonJS((exports, module) => {
         let chat = await Chat.findOne({ order_id: orderId });
         if (!chat) {
           chat = await Chat.create({ order_id: orderId, participants });
+        } else {
+          const existing = new Set((chat.participants || []).map((p) => p && p.id).filter(Boolean));
+          let changed = false;
+          for (const p of participants || []) {
+            if (p && p.id && !existing.has(p.id)) {
+              chat.participants.push(p);
+              existing.add(p.id);
+              changed = true;
+            }
+          }
+          if (changed)
+            await chat.save();
         }
         return { status: "success", chat };
       } catch (error) {
@@ -83894,6 +83906,14 @@ var require_ChatServices = __commonJS((exports, module) => {
         throw new Error(error.message || "Failed to get messages");
       }
     }
+    async getChatsByUser(userId) {
+      try {
+        const chats = await Chat.find({ "participants.id": userId }).sort({ updatedAt: -1 });
+        return { status: "success", chats };
+      } catch (error) {
+        throw new Error(error.message || "Failed to get chats for user");
+      }
+    }
   }
   module.exports = new ChatServices;
 });
@@ -83933,6 +83953,14 @@ var require_ChatControllers = __commonJS((exports, module) => {
       try {
         const { before, limit } = req.query;
         const result = await ChatServices.getMessages(req.params.orderId, before, limit ? Number(limit) : 50);
+        res.status(200).json(result);
+      } catch (error) {
+        res.status(400).json({ status: "error", message: error.message || "Failed" });
+      }
+    }
+    async getChatsByUser(req, res) {
+      try {
+        const result = await ChatServices.getChatsByUser(req.params.userId);
         res.status(200).json(result);
       } catch (error) {
         res.status(400).json({ status: "error", message: error.message || "Failed" });
@@ -84176,16 +84204,17 @@ var AdSchema_default = import_mongoose4.default.model("Ad", AdSchema);
 
 // Services/ChiefProfileServices.js
 init_PlatformConfigSchema();
-var import_mongoose6 = __toESM(require_mongoose2(), 1);
-var DailyDishAvailabilitySchema = new import_mongoose6.default.Schema({
-  chief_id: { type: import_mongoose6.default.Schema.Types.ObjectId, ref: "Chief Profile", required: true },
-  dish_id: { type: import_mongoose6.default.Schema.Types.ObjectId, ref: "Dish", required: true },
+init_ChatSchema();
+var import_mongoose7 = __toESM(require_mongoose2(), 1);
+var DailyDishAvailabilitySchema = new import_mongoose7.default.Schema({
+  chief_id: { type: import_mongoose7.default.Schema.Types.ObjectId, ref: "Chief Profile", required: true },
+  dish_id: { type: import_mongoose7.default.Schema.Types.ObjectId, ref: "Dish", required: true },
   date: { type: String, required: true },
   pieces_available: { type: Number, required: true, min: 0 },
   pieces_sold: { type: Number, default: 0, min: 0 }
 }, { timestamps: true });
 DailyDishAvailabilitySchema.index({ chief_id: 1, dish_id: 1, date: 1 }, { unique: true });
-var DailyDishAvailability = import_mongoose6.default.models.DailyDishAvailability || import_mongoose6.default.model("DailyDishAvailability", DailyDishAvailabilitySchema);
+var DailyDishAvailability = import_mongoose7.default.models.DailyDishAvailability || import_mongoose7.default.model("DailyDishAvailability", DailyDishAvailabilitySchema);
 var ADDRESS_SERVICE_URL = process.env.ADDRESS_SERVICE_URL || "https://jewaraddress-services-production.up.railway.app/api/v1/address";
 var PREFERRED_DISHES_SERVICE_URL = process.env.PREFERRED_DISHES_SERVICE_URL || "https://jewardishprefered-services-production.up.railway.app/api/v1/preferred-dishes-chief";
 var CUSTOMER_SERVICE_URL = process.env.CUSTOMER_SERVICE_URL || "https://jewarcustomerprofile-services-production.up.railway.app/api/v1/customer-profile";
@@ -84198,6 +84227,114 @@ var REQUIRED_VERIFICATION_STEPS = [
   "Tax_Card_Status",
   "Payment_Method_Status"
 ];
+async function fetchAddressLocation(profileId) {
+  if (!profileId)
+    return null;
+  try {
+    const addrRes = await fetch(`${ADDRESS_SERVICE_URL}/?Profile_id=${profileId}`, { headers: { "Content-Type": "application/json" } });
+    if (!addrRes.ok)
+      return null;
+    const addrData = await addrRes.json();
+    const addrs = addrData?.addresses ?? addrData?.data ?? [];
+    const primary = addrs.find((a) => a.is_primary) || addrs[0];
+    if (!primary)
+      return null;
+    const lat = Number(primary.latitude);
+    const lng = Number(primary.longitude);
+    const parts = [
+      primary.street,
+      primary.building_Number,
+      primary.city,
+      primary.governorate
+    ].filter((p) => p && String(p).trim() !== "");
+    return {
+      latitude: Number.isFinite(lat) ? lat : null,
+      longitude: Number.isFinite(lng) ? lng : null,
+      full_text: parts.join(", ")
+    };
+  } catch (_) {
+    return null;
+  }
+}
+async function enrichOrderForClient(orderDoc) {
+  const o = orderDoc && orderDoc.toObject ? orderDoc.toObject() : orderDoc;
+  if (!o)
+    return o;
+  if (o.chef_id) {
+    try {
+      const chef = await ShopOwnerProfileSchema_default.findById(o.chef_id).select("name phone shop_address profile_image shop_cover Payment_Method");
+      if (chef) {
+        o.chef_name = chef.name;
+        o.chef_phone = chef.phone || "";
+        o.chef_address = chef.shop_address || "";
+        o.chef_image = chef.shop_cover || chef.profile_image || "";
+        if (chef.Payment_Method) {
+          o.chef_payment_method = {
+            provider: chef.Payment_Method.provider || "",
+            details: chef.Payment_Method.details || ""
+          };
+        }
+      }
+    } catch (_) {}
+  }
+  if (o.customer_id) {
+    try {
+      const custRes = await fetch(`${CUSTOMER_SERVICE_URL}/auth/${o.customer_id}`, {
+        headers: { "Content-Type": "application/json" }
+      });
+      if (custRes.ok) {
+        const custData = await custRes.json();
+        const cust = custData.profile || custData.response || custData;
+        o.customer_name = cust.name || cust.full_name || "Customer";
+        o.customer_phone = cust.phone || "";
+        o.customer_email = cust.email || "";
+        o.customer_avatar = cust.avatar || "";
+      }
+    } catch (_) {}
+  }
+  if (o.driver_id) {
+    try {
+      const dRes = await fetch(`${DRIVER_SERVICE_URL}/${o.driver_id}`, {
+        headers: { "Content-Type": "application/json" }
+      });
+      if (dRes.ok) {
+        const dData = await dRes.json();
+        const driver = dData.profile || dData.driver || dData;
+        o.driver_name = driver.name || driver.full_name || "Driver";
+        o.driver_phone = driver.phone || driver.mobile || "";
+        o.driver_avatar = driver.avatar || "";
+      }
+    } catch (_) {}
+  }
+  const [shopLoc, custLoc] = await Promise.all([
+    o.chef_id ? fetchAddressLocation(o.chef_id) : Promise.resolve(null),
+    o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null)
+  ]);
+  if (shopLoc) {
+    o.shop_latitude = shopLoc.latitude;
+    o.shop_longitude = shopLoc.longitude;
+    o.shop_full_address = shopLoc.full_text || o.chef_address || "";
+  }
+  if (custLoc) {
+    o.customer_latitude = custLoc.latitude;
+    o.customer_longitude = custLoc.longitude;
+    o.customer_full_address = custLoc.full_text || o.delivery_address?.street || "";
+  }
+  return o;
+}
+async function upsertChatParticipants(orderId, participants) {
+  if (!orderId)
+    return;
+  try {
+    const filtered = (participants || []).filter((p) => p && p.id);
+    if (filtered.length === 0)
+      return;
+    await ChatSchema_default.findOneAndUpdate({ order_id: orderId }, {
+      $setOnInsert: { order_id: orderId },
+      $addToSet: { participants: { $each: filtered } }
+    }, { upsert: true, new: true });
+  } catch (_) {}
+}
 
 class ChiefProfileService {
   async createProfile(data) {
@@ -84268,7 +84405,7 @@ class ChiefProfileService {
       const profile = await ShopOwnerProfileSchema_default.findById(profileId);
       if (!profile)
         throw new Error("Profile not found");
-      const db = import_mongoose6.default.connection.db;
+      const db = import_mongoose7.default.connection.db;
       const IMAGES_SVC = process.env.IMAGES_SERVICE_URL || "https://jewarimage-services-production.up.railway.app/api/v2/images";
       async function deleteUrl(url) {
         if (!url)
@@ -84284,7 +84421,7 @@ class ChiefProfileService {
       const sidStr = String(profileId);
       let sidOid = null;
       try {
-        sidOid = new import_mongoose6.default.Types.ObjectId(sidStr);
+        sidOid = new import_mongoose7.default.Types.ObjectId(sidStr);
       } catch (_) {}
       const both = (field) => sidOid ? { $or: [{ [field]: sidStr }, { [field]: sidOid }] } : { [field]: sidStr };
       const imageUrls = [
@@ -84312,7 +84449,7 @@ class ChiefProfileService {
       await db.collection("preferreddishchiefs").deleteMany(both("chief_id"));
       await db.collection("dailydishavailabilities").deleteMany(both("chief_id"));
       await db.collection("orders").deleteMany(both("chef_id"));
-      await db.collection("addresses").deleteMany({ Profile_id: new import_mongoose6.default.Types.ObjectId(sidStr) });
+      await db.collection("addresses").deleteMany({ Profile_id: new import_mongoose7.default.Types.ObjectId(sidStr) });
       await ShopOwnerProfileSchema_default.findByIdAndDelete(profileId);
       return { status: "success", message: "Profile and all related data deleted successfully" };
     } catch (error) {
@@ -84576,6 +84713,14 @@ class ChiefProfileService {
   async createOrder(data) {
     try {
       const order = await OrderSchema_default.create(data);
+      const participants = [];
+      if (data.customer_id) {
+        participants.push({ id: data.customer_id, role: "customer", name: data.customer_name || "" });
+      }
+      if (data.chef_id) {
+        participants.push({ id: data.chef_id, role: "chef", name: data.chef_name || "" });
+      }
+      await upsertChatParticipants(String(order._id), participants);
       return { status: "success", order };
     } catch (error) {
       throw new Error(error.message || "Failed to create order");
@@ -84584,7 +84729,8 @@ class ChiefProfileService {
   async getOrdersByChef(chefId) {
     try {
       const orders = await OrderSchema_default.find({ chef_id: chefId }).sort({ createdAt: -1 });
-      return { status: "success", orders };
+      const enriched = await Promise.all(orders.map((o) => enrichOrderForClient(o)));
+      return { status: "success", orders: enriched };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch chef orders");
     }
@@ -84592,7 +84738,8 @@ class ChiefProfileService {
   async getOrdersByCustomer(customerId) {
     try {
       const orders = await OrderSchema_default.find({ customer_id: customerId }).sort({ createdAt: -1 });
-      return { status: "success", orders };
+      const enriched = await Promise.all(orders.map((o) => enrichOrderForClient(o)));
+      return { status: "success", orders: enriched };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch customer orders");
     }
@@ -84602,7 +84749,8 @@ class ChiefProfileService {
       const order = await OrderSchema_default.findById(orderId);
       if (!order)
         throw new Error("Order not found");
-      return { status: "success", order };
+      const enriched = await enrichOrderForClient(order);
+      return { status: "success", order: enriched };
     } catch (error) {
       throw new Error(error.message || "Failed to fetch order");
     }
@@ -84916,6 +85064,20 @@ class ChiefProfileService {
             }
           } catch (_) {}
         }
+        const [shopLoc, custLoc] = await Promise.all([
+          o.chef_id ? fetchAddressLocation(o.chef_id) : Promise.resolve(null),
+          o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null)
+        ]);
+        if (shopLoc) {
+          o.shop_latitude = shopLoc.latitude;
+          o.shop_longitude = shopLoc.longitude;
+          o.shop_full_address = shopLoc.full_text || o.chef_address || "";
+        }
+        if (custLoc) {
+          o.customer_latitude = custLoc.latitude;
+          o.customer_longitude = custLoc.longitude;
+          o.customer_full_address = custLoc.full_text || o.delivery_address?.street || "";
+        }
         return o;
       }));
       return { status: "success", orders: enriched };
@@ -84925,12 +85087,14 @@ class ChiefProfileService {
   }
   async acceptOrderDriver(orderId, driverId) {
     try {
+      let driverName = "";
       if (driverId) {
         try {
           const dRes = await fetch(`${DRIVER_SERVICE_URL}/${driverId}`, { headers: { "Content-Type": "application/json" } });
           if (dRes.ok) {
             const dData = await dRes.json();
             const driver = dData.profile || dData.driver || dData;
+            driverName = driver.name || driver.full_name || "";
             if (!driver.online_status || !driver.Is_Verified) {
               throw new Error("Go online and complete account activation to accept orders");
             }
@@ -84951,9 +85115,10 @@ class ChiefProfileService {
         _id: orderId,
         order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
         $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }]
-      }, { driver_id: driverId, order_status: "out_for_delivery" }, { new: true });
+      }, { driver_id: driverId, order_status: "accepted", delivery_step: "accepted" }, { new: true });
       if (!order)
         throw new Error("Order not available or already accepted by another driver");
+      await upsertChatParticipants(String(order._id), [{ id: driverId, role: "driver", name: driverName }]);
       return { status: "success", order };
     } catch (error) {
       throw new Error(error.message || "Failed to accept order for driver");
@@ -85020,7 +85185,9 @@ class ChiefProfileService {
         }
         order.driver_id = offer.driver_id;
         order.agreed_delivery_fee = offer.amount;
-        order.order_status = "out_for_delivery";
+        order.order_status = "accepted";
+        order.delivery_step = "accepted";
+        await upsertChatParticipants(String(order._id), [{ id: offer.driver_id, role: "driver", name: offer.driver_name || "" }]);
       } else {
         offer.status = "rejected";
       }
@@ -85065,6 +85232,20 @@ class ChiefProfileService {
               o.customer_avatar = cust.avatar || "";
             }
           } catch (_) {}
+        }
+        const [shopLoc, custLoc] = await Promise.all([
+          o.chef_id ? fetchAddressLocation(o.chef_id) : Promise.resolve(null),
+          o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null)
+        ]);
+        if (shopLoc) {
+          o.shop_latitude = shopLoc.latitude;
+          o.shop_longitude = shopLoc.longitude;
+          o.shop_full_address = shopLoc.full_text || o.chef_address || "";
+        }
+        if (custLoc) {
+          o.customer_latitude = custLoc.latitude;
+          o.customer_longitude = custLoc.longitude;
+          o.customer_full_address = custLoc.full_text || o.delivery_address?.street || "";
         }
         return o;
       }));
@@ -85131,6 +85312,8 @@ class ChiefProfileService {
       order.delivery_step = step;
       if (step === "delivered") {
         order.order_status = "completed";
+      } else if (step === "picked_up" || step === "in_transit") {
+        order.order_status = "out_for_delivery";
       }
       await order.save();
       return { status: "success", order };
@@ -85963,6 +86146,7 @@ var import_express2 = __toESM(require_express(), 1);
 var ChatControllers = require_ChatControllers();
 var router2 = import_express2.Router();
 router2.post("/", ChatControllers.getOrCreateChat);
+router2.get("/user/:userId", ChatControllers.getChatsByUser);
 router2.get("/order/:orderId", ChatControllers.getChatByOrder);
 router2.post("/order/:orderId/message", ChatControllers.sendMessage);
 router2.get("/order/:orderId/messages", ChatControllers.getMessages);

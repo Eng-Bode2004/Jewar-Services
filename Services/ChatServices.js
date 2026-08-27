@@ -6,6 +6,23 @@ class ChatServices {
       let chat = await Chat.findOne({ order_id: orderId });
       if (!chat) {
         chat = await Chat.create({ order_id: orderId, participants });
+      } else {
+        // Merge any participants that aren't already in the chat so that every
+        // role (customer / driver / chef) that touches the chat becomes a
+        // participant. This is required for the per-user in-app popup poller
+        // (getChatsByUser) to find the chat for each participant.
+        const existing = new Set(
+          ((chat.participants || []).map((p) => p && p.id)).filter(Boolean)
+        );
+        let changed = false;
+        for (const p of participants || []) {
+          if (p && p.id && !existing.has(p.id)) {
+            chat.participants.push(p);
+            existing.add(p.id);
+            changed = true;
+          }
+        }
+        if (changed) await chat.save();
       }
       return { status: "success", chat };
     } catch (error) {
@@ -53,6 +70,17 @@ class ChatServices {
       return { status: "success", messages: sliced };
     } catch (error) {
       throw new Error(error.message || "Failed to get messages");
+    }
+  }
+
+  // List every chat the given user is a participant in, newest first. Used by
+  // the clients to poll for new inbound chat messages to show as in-app popups.
+  async getChatsByUser(userId) {
+    try {
+      const chats = await Chat.find({ "participants.id": userId }).sort({ updatedAt: -1 });
+      return { status: "success", chats };
+    } catch (error) {
+      throw new Error(error.message || "Failed to get chats for user");
     }
   }
 }
