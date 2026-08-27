@@ -54,6 +54,14 @@ const CustomerProfileSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Free-text delivery address entered by the customer during verification
+    // and kept editable on their profile.
+    address: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     Is_Address_Verified: {
       type: Boolean,
       default: false,
