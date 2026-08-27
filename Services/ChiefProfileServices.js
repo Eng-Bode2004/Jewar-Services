@@ -807,7 +807,16 @@ class ChiefProfileService {
       // Rating-based priority: top drivers (rating >= 4.0) see the full order pool
       // immediately, while lower-rated drivers only see orders older than 30 seconds,
       // giving high-rated drivers a head start on new orders.
-      const baseQuery = { order_status: "ready", $or: [{ driver_id: { $exists: false } }, { driver_id: null }] };
+      // Pool contents: orders that need a driver are either `ready`, OR whole-order
+      // online orders that are still being prepared at the shop (so drivers can bid
+      // on them ahead of pickup). Cash orders stay at the shop only.
+      const baseQuery = {
+        order_status: { $nin: ["cancelled", "completed"] },
+        $or: [{ driver_id: { $exists: false } }, { driver_id: null }],
+        $and: [
+          { $or: [{ order_status: "ready" }, { delivery_payment_method: "online" }] },
+        ],
+      };
       if (driverRating < 4) {
         const cutoff = new Date(Date.now() - 30 * 1000);
         baseQuery.createdAt = { $lte: cutoff };
@@ -864,12 +873,17 @@ class ChiefProfileService {
 
       // City-based filtering: only show orders whose delivery address city matches driver's city
       if (driverCity) {
-        const normalizedDriverCity = driverCity.toLowerCase().trim();
+        const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, "").trim();
+        const normalizedDriverCity = norm(driverCity);
         enriched = enriched.filter((o) => {
-          const orderCity = (o.delivery_address?.city || "").toLowerCase().trim();
-          const chefCity = (o.chef_city || "").toLowerCase().trim();
-          // Show order if it matches driver's city OR chef is in driver's city
-          return orderCity === normalizedDriverCity || chefCity === normalizedDriverCity;
+          const orderCity = norm(o.delivery_address?.city);
+          const chefCity = norm(o.chef_city);
+          // Show order if the driver city matches the order's delivery city OR
+          // the chef's city (containment both ways tolerates sub-city differences).
+          return (
+            (orderCity && (orderCity === normalizedDriverCity || orderCity.includes(normalizedDriverCity) || normalizedDriverCity.includes(orderCity))) ||
+            (chefCity && (chefCity === normalizedDriverCity || chefCity.includes(normalizedDriverCity) || normalizedDriverCity.includes(chefCity)))
+          );
         });
       }
 
@@ -933,7 +947,10 @@ class ChiefProfileService {
       const order = await OrderSchema.findById(orderId);
       if (!order) throw new Error("Order not found");
       if (order.driver_id) throw new Error("Order already has a driver");
-      if (!["ready", "preparing", "accepted"].includes(order.order_status)) {
+      // Open for offers while the order is still active and no driver assigned.
+      // Online whole-order payments are offered on even while the shop prepares (pending).
+      const closed = ["out_for_delivery", "delivered", "completed", "cancelled"];
+      if (closed.includes(order.order_status)) {
         throw new Error("Order is not open for offers");
       }
       order.delivery_offers = (order.delivery_offers || []).filter(
