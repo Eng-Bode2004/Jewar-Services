@@ -4,6 +4,13 @@ import mongoose from "mongoose";
 class DriverProfileService {
     async createProfile(data) {
         try {
+            data.Is_Verified = false;
+            data.Verification_Status = "not_submitted";
+            data.National_ID_Status = "pending";
+            data.Driver_License_Status = "pending";
+            data.Vehicle_License_Status = "pending";
+            data.Vehicle_Status = "pending";
+            data.Background_Check_Status = "pending";
             const profile = await DriverProfileModel.create(data);
             return { status: "success", profile };
         } catch (error) {
@@ -129,23 +136,19 @@ class DriverProfileService {
 
     async updateVerificationStep(profileId, step, status) {
         try {
-            const validSteps = ["Documents_Status", "Vehicle_Status", "Background_Check_Status", "Verification_Status"];
+            const validSteps = ["National_ID_Status", "Driver_License_Status", "Vehicle_License_Status", "Vehicle_Status", "Background_Check_Status", "Verification_Status"];
             if (!validSteps.includes(step)) {
                 throw new Error(`Invalid step: ${step}. Must be one of: ${validSteps.join(", ")}`);
             }
-            const updated = await DriverProfileModel.findByIdAndUpdate(
-                profileId,
-                { [step]: status },
-                { new: true }
-            );
-            if (!updated) throw new Error("Profile not found");
-
+            const updated = await DriverProfileModel.findByIdAndUpdate(profileId, { [step]: status }, { new: true });
+            
             // Auto-check if all steps are verified
             if (status === "verified") {
                const check = await DriverProfileModel.findById(profileId);
-               if (check.Documents_Status === "verified" && 
-                   check.Vehicle_Status === "verified" && 
-                   check.Background_Check_Status === "verified") {
+               if (check.National_ID_Status === "verified" && 
+                   check.Driver_License_Status === "verified" && 
+                   check.Vehicle_License_Status === "verified" && 
+                   check.Vehicle_Status === "verified") {
                    await DriverProfileModel.findByIdAndUpdate(profileId, { Verification_Status: "pending_review" });
                }
             }
@@ -175,7 +178,7 @@ class DriverProfileService {
 
     async rejectSteps(profileId, steps, reason) {
         try {
-            const validSteps = ["Documents_Status", "Vehicle_Status", "Background_Check_Status"];
+            const validSteps = ["National_ID_Status", "Driver_License_Status", "Vehicle_License_Status", "Vehicle_Status", "Background_Check_Status"];
             if (!Array.isArray(steps) || steps.length === 0) {
                 throw new Error("steps array is required");
             }
@@ -209,7 +212,7 @@ class DriverProfileService {
             else if (docType === "background_check") update["documents.background_check"] = fileUrl;
             else throw new Error("Invalid document type");
 
-            update.Documents_Status = "in_progress";
+            update.National_ID_Status = "in_progress";
 
             const updated = await DriverProfileModel.findByIdAndUpdate(profileId, update, { new: true });
             if (!updated) throw new Error("Profile not found");
@@ -223,7 +226,7 @@ class DriverProfileService {
         try {
             const updated = await DriverProfileModel.findByIdAndUpdate(profileId, {
                 license: { front_image: frontImage, back_image: backImage, number, expiry },
-                Documents_Status: "in_progress" // Since license is part of documents/vehicle validation usually
+                Driver_License_Status: "in_progress"
             }, { new: true });
             if (!updated) throw new Error("Profile not found");
             return { status: "success", profile: updated };

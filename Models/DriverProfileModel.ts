@@ -81,7 +81,9 @@ const DriverProfileSchema = new mongoose.Schema({
         background_check: { type: String },
     },
 
-    Documents_Status: stepStatus,
+    National_ID_Status: stepStatus,
+    Driver_License_Status: stepStatus,
+    Vehicle_License_Status: stepStatus,
     Vehicle_Status: stepStatus,
     Background_Check_Status: stepStatus,
 
