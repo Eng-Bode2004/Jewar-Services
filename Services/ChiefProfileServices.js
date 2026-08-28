@@ -32,6 +32,12 @@ const REQUIRED_VERIFICATION_STEPS = [
     "Payment_Method_Status",
 ];
 
+// A delivery-request order that a customer created but never completed (no
+// driver assigned, still pending) is considered abandoned once it is older
+// than this timeout, and is auto-cancelled so it stops appearing in the
+// driver pool and shop/customer order lists.
+const PENDING_DELIVERY_TTL_MS = 30 * 60 * 1000;
+
 // Fetch the primary saved AddressService location (lat/lng + full text) for a
 // Profile_id. Used to give drivers the shop + customer coordinates and full
 // text addresses so they can see both locations on a map in order details.
@@ -881,6 +887,7 @@ class ChiefProfileService {
 
   async getOrdersByChef(chefId) {
     try {
+      await this.cancelExpiredOrders();
       const orders = await OrderSchema.find({ chef_id: chefId }).sort({ createdAt: -1 });
       const enriched = await Promise.all(orders.map((o) => enrichOrderForClient(o)));
       return { status: "success", orders: enriched };
@@ -891,6 +898,7 @@ class ChiefProfileService {
 
   async getOrdersByCustomer(customerId) {
     try {
+      await this.cancelExpiredOrders();
       const orders = await OrderSchema.find({ customer_id: customerId }).sort({ createdAt: -1 });
       const enriched = await Promise.all(orders.map((o) => enrichOrderForClient(o)));
       return { status: "success", orders: enriched };
@@ -1259,8 +1267,40 @@ class ChiefProfileService {
 
   // â”€â”€ Driver Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   
+  // Auto-cancel delivery-request orders the customer created but abandoned:
+  // still "pending", no driver ever assigned, and older than the TTL. Running
+  // this before every order-list query keeps abandoned orders from lingering
+  // in the driver pool or on the shop/customer order lists.
+  async cancelExpiredOrders() {
+    try {
+      const expiredBefore = new Date(Date.now() - PENDING_DELIVERY_TTL_MS);
+      await OrderSchema.updateMany(
+        {
+          order_status: "pending",
+          delivery_step: "none",
+          refund_status: { $ne: "shop_initiated" },
+          createdAt: { $lte: expiredBefore },
+          $or: [
+            { driver_id: { $exists: false } },
+            { driver_id: null },
+            { driver_id: "" },
+          ],
+        },
+        {
+          $set: {
+            order_status: "cancelled",
+            rejection_reason: "Delivery request expired",
+          },
+        }
+      );
+    } catch (error) {
+      throw new Error(error.message || "Failed to expire abandoned orders");
+    }
+  }
+
   async getAvailableOrdersForDriver(driverId) {
     try {
+      await this.cancelExpiredOrders();
       // Only online + verified drivers may see the order pool.
       let driverRating = 0;
       let driverCity = null;
@@ -1656,6 +1696,7 @@ class ChiefProfileService {
 
   async getDriverOrders(driverId) {
     try {
+      await this.cancelExpiredOrders();
       const orders = await OrderSchema.find({ driver_id: driverId }).sort({ createdAt: -1 });
       const enriched = await Promise.all(orders.map(async (order) => {
         const o = order.toObject();
