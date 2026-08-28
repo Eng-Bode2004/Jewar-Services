@@ -239,6 +239,88 @@ async function deductOrderStock(order) {
     return { status: "success", outOfStock };
 }
 
+// ── Atomic per-driver active-delivery counter ─────────────────────────
+// Guards the "max 3 simultaneous active deliveries" rule against concurrent
+// accepts. Uses a single counter document per driver, updated atomically with a
+// `$lt: 3` filter (protected by a unique index + MongoDB's per-document write
+// lock), so two racing accepts can never both pass the cap. The counter is
+// released (decremented) when a delivery completes.
+
+const ACTIVE_ORDERS_COLLECTION = "driver_active_orders";
+const ACTIVE_ORDERS_LIMIT = 3;
+
+async function ensureActiveOrdersIndex() {
+    try {
+        const db = mongoose.connection.db;
+        await db.collection(ACTIVE_ORDERS_COLLECTION).createIndex(
+            { driver_id: 1 },
+            { unique: true }
+        );
+    } catch (_) {}
+}
+
+// Atomically acquire one delivery slot for a driver. Returns true on success,
+// false if the driver is already at the active-delivery limit.
+async function acquireDriverDeliverySlot(driverId) {
+    if (!driverId) return false;
+    const db = mongoose.connection.db;
+    const coll = db.collection(ACTIVE_ORDERS_COLLECTION);
+    await ensureActiveOrdersIndex();
+    // Make sure a counter row exists for the driver (idempotent, safe under
+    // the unique index).
+    await coll.updateOne(
+        { driver_id: driverId },
+        { $setOnInsert: { active: 0 } },
+        { upsert: true }
+    ).catch(() => {});
+    // Atomically take a slot: only matches while active < limit. The
+    // per-document write lock ensures concurrent calls see the latest count.
+    const inc = async () =>
+        await coll.findOneAndUpdate(
+            { driver_id: driverId, active: { $lt: ACTIVE_ORDERS_LIMIT } },
+            { $inc: { active: 1 } },
+            { returnDocument: "after" }
+        );
+    let res = await inc();
+    if (res && res.value) return true;
+    // The counter shows the driver is at the limit. Reconcile against the real
+    // set of active orders and retry once — this self-heals slots that leaked
+    // if an assigned order was later cancelled or unassigned.
+    try {
+        const realActive = await OrderSchema.countDocuments({
+            driver_id: String(driverId),
+            order_status: { $nin: ["completed", "cancelled", "delivered", ""] },
+        });
+        if (realActive < ACTIVE_ORDERS_LIMIT) {
+            await coll.updateOne(
+                { driver_id: driverId },
+                { $set: { active: realActive } }
+            );
+            res = await inc();
+            if (res && res.value) return true;
+        }
+    } catch (_) {}
+    return false;
+}
+
+// Atomically release one delivery slot after the driver completes a delivery.
+async function releaseDriverDeliverySlot(driverId) {
+    if (!driverId) return;
+    const db = mongoose.connection.db;
+    await db.collection(ACTIVE_ORDERS_COLLECTION).updateOne(
+        { driver_id: driverId },
+        [
+            {
+                $set: {
+                    active: {
+                        $max: [{ $subtract: [{ $ifNull: ["$active", 0] }, 1] }, 0],
+                    },
+                },
+            },
+        ]
+    ).catch(() => {});
+}
+
 // Apply per-item (dish) ratings from a completed order to each dish's running
 // average. Uses a count so the average converges correctly.
 async function applyItemRatings(itemRatings) {
@@ -1285,29 +1367,53 @@ class ChiefProfileService {
           if (e && e.message && e.message.includes("activation")) throw e;
         }
       }
-      // Cap the number of simultaneous active deliveries per driver (max 3).
-      const activeCount = await OrderSchema.countDocuments({
-        driver_id: driverId,
-        order_status: { $nin: ["completed", "cancelled", "delivered", ""] },
-      });
-      if (activeCount >= 3) {
+      // Atomically reserve a delivery slot (max 3 active per driver). This is
+      // race-safe: concurrent accepts by the same driver can never both pass.
+      if (!(await acquireDriverDeliverySlot(driverId))) {
         throw new Error("You already have 3 active deliveries. Complete one before accepting more.");
       }
-      const order = await OrderSchema.findOneAndUpdate(
-        {
-          _id: orderId,
-          order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
-          refund_status: { $ne: "shop_initiated" },
-          $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }],
-        },
-        { driver_id: driverId, order_status: "accepted", delivery_step: "accepted" },
-        { new: true }
-      );
-      if (!order) throw new Error("Order not available or already accepted by another driver");
-      // Add the driver to the order's chat so the customer and driver can
-      // message each other and both get in-app chat popups.
-      await upsertChatParticipants(String(order._id), [{ id: driverId, role: "driver", name: driverName }]);
-      return { status: "success", order };
+      try {
+        const order = await OrderSchema.findOneAndUpdate(
+          {
+            _id: orderId,
+            order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
+            refund_status: { $ne: "shop_initiated" },
+            $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }],
+          },
+          [
+            {
+              $set: {
+                driver_id: driverId,
+                delivery_step: "accepted",
+                // A shop order that's already being prepared / ready for pickup
+                // must NOT be stepped backwards to "accepted" — the driver
+                // simply comes to the shop to collect it.
+                order_status: {
+                  $cond: {
+                    if: { $in: ["$order_status", ["preparing", "ready"]] },
+                    then: "$order_status",
+                    else: "accepted",
+                  },
+                },
+              },
+            },
+          ],
+          { new: true }
+        );
+        if (!order) {
+          // Claim failed — free the reserved slot so it isn't leaked.
+          await releaseDriverDeliverySlot(driverId);
+          throw new Error("Order not available or already accepted by another driver");
+        }
+        // Add the driver to the order's chat so the customer and driver can
+        // message each other and both get in-app chat popups.
+        await upsertChatParticipants(String(order._id), [{ id: driverId, role: "driver", name: driverName }]);
+        return { status: "success", order };
+      } catch (err) {
+        // Release the slot if the assignment itself failed for any reason.
+        await releaseDriverDeliverySlot(driverId).catch(() => {});
+        throw err;
+      }
     } catch (error) {
       throw new Error(error.message || "Failed to accept order for driver");
     }
@@ -1335,27 +1441,59 @@ class ChiefProfileService {
         if (e && e.message && e.message.includes("activation")) throw e;
       }
 
-      const order = await OrderSchema.findById(orderId);
-      if (!order) throw new Error("Order not found");
-      if (order.driver_id) throw new Error("Order already has a driver");
-      // Open for offers while the order is still active and no driver assigned.
-      // Online whole-order payments are offered on even while the shop prepares (pending).
+      // Atomically add (or refresh) the driver's proposed offer on the order.
+      // One single-document update, so concurrent drivers proposing at the same
+      // time can't overwrite each other's offers (a read-modify-write + save()
+      // would lose updates). Dedupes the bidding driver's own prior proposal.
       const closed = ["out_for_delivery", "delivered", "completed", "cancelled"];
-      if (closed.includes(order.order_status)) {
+      const res = await OrderSchema.updateOne(
+        {
+          _id: orderId,
+          $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }],
+          order_status: { $nin: closed },
+        },
+        [
+          {
+            $set: {
+              delivery_offers: {
+                $concatArrays: [
+                  {
+                    $filter: {
+                      input: { $ifNull: ["$delivery_offers", []] },
+                      as: "o",
+                      cond: {
+                        $or: [
+                          { $ne: ["$$o.status", "proposed"] },
+                          { $ne: [{ $toString: { $ifNull: ["$$o.driver_id", ""] } }, String(driverId)] },
+                        ],
+                      },
+                    },
+                  },
+                  [
+                    {
+                      driver_id: String(driverId),
+                      driver_name: driverName || "Driver",
+                      amount: price,
+                      status: "proposed",
+                      created_at: new Date(),
+                    },
+                  ],
+                ],
+              },
+            },
+          },
+        ]
+      );
+
+      if (!res.matchedCount) {
+        const order = await OrderSchema.findById(orderId);
+        if (!order) throw new Error("Order not found");
+        if (order.driver_id) throw new Error("Order already has a driver");
         throw new Error("Order is not open for offers");
       }
-      order.delivery_offers = (order.delivery_offers || []).filter(
-        (o) => o.status === "proposed" && String(o.driver_id) !== String(driverId)
-      );
-      order.delivery_offers.push({
-        driver_id: String(driverId),
-        driver_name: driverName || "Driver",
-        amount: price,
-        status: "proposed",
-        created_at: new Date(),
-      });
-      await order.save();
-      return { status: "success", order };
+
+      const updated = await OrderSchema.findById(orderId);
+      return { status: "success", order: updated };
     } catch (error) {
       throw new Error(error.message || "Failed to send offer");
     }
@@ -1371,21 +1509,111 @@ class ChiefProfileService {
       if (order.driver_id) throw new Error("Order already has a driver");
 
       if (accept) {
+        // The accepting driver also consumes one of their active-delivery slots.
+        if (!(await acquireDriverDeliverySlot(offer.driver_id))) {
+          throw new Error("Driver already has 3 active deliveries — this offer can't be accepted");
+        }
+        try {
+          for (const o of order.delivery_offers) {
+            o.status = o._id.toString() === offerId ? "accepted" : "rejected";
+          }
+          order.driver_id = offer.driver_id;
+          order.agreed_delivery_fee = offer.amount;
+          order.order_status = "accepted";
+          order.delivery_step = "accepted";
+          await upsertChatParticipants(String(order._id), [{ id: offer.driver_id, role: "driver", name: offer.driver_name || "" }]);
+          await order.save();
+        } catch (err) {
+          // Roll back the reserved slot if the assignment failed.
+          await releaseDriverDeliverySlot(offer.driver_id).catch(() => {});
+          throw err;
+        }
+      } else {
+        offer.status = "rejected";
+        await order.save();
+      }
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to respond to offer");
+    }
+  }
+
+  // Shop owner accepts a driver's delivery offer for a shop order. Unlike the
+  // customer-facing respondDeliveryOffer (which resets an order to "accepted"),
+  // this keeps the shop order's current status (e.g. "ready") so the driver
+  // simply comes to the shop to pick up. Assigns the driver and locks in the
+  // agreed delivery fee from the winning offer.
+  async acceptDriverOfferForShop(orderId, offerId) {
+    try {
+      const order = await OrderSchema.findById(orderId);
+      if (!order) throw new Error("Order not found");
+      const offer = (order.delivery_offers || []).id(offerId);
+      if (!offer) throw new Error("Offer not found");
+      if (offer.status !== "proposed") throw new Error("Offer already answered");
+      if (order.driver_id) throw new Error("Order already has a driver");
+      if (["out_for_delivery", "completed", "cancelled", "delivered"].includes(order.order_status)) {
+        throw new Error("Order is no longer open for a driver");
+      }
+
+      // The accepting driver also consumes one of their active-delivery slots.
+      if (!(await acquireDriverDeliverySlot(offer.driver_id))) {
+        throw new Error("Driver already has 3 active deliveries — this offer can't be accepted");
+      }
+      try {
         for (const o of order.delivery_offers) {
           o.status = o._id.toString() === offerId ? "accepted" : "rejected";
         }
         order.driver_id = offer.driver_id;
         order.agreed_delivery_fee = offer.amount;
-        order.order_status = "accepted";
+        if (!["ready", "preparing", "accepted"].includes(order.order_status)) {
+          order.order_status = "accepted";
+        }
         order.delivery_step = "accepted";
         await upsertChatParticipants(String(order._id), [{ id: offer.driver_id, role: "driver", name: offer.driver_name || "" }]);
-      } else {
-        offer.status = "rejected";
+        await order.save();
+      } catch (err) {
+        // Roll back the reserved slot if the assignment failed.
+        await releaseDriverDeliverySlot(offer.driver_id).catch(() => {});
+        throw err;
       }
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to accept driver offer");
+    }
+  }
+
+  // Shop owner rejects a driver's offer (frees the order for another bid).
+  async rejectDriverOfferForShop(orderId, offerId) {
+    try {
+      const order = await OrderSchema.findById(orderId);
+      if (!order) throw new Error("Order not found");
+      const offer = (order.delivery_offers || []).id(offerId);
+      if (!offer) throw new Error("Offer not found");
+      if (offer.status !== "proposed") throw new Error("Offer already answered");
+      offer.status = "rejected";
       await order.save();
       return { status: "success", order };
     } catch (error) {
-      throw new Error(error.message || "Failed to respond to offer");
+      throw new Error(error.message || "Failed to reject driver offer");
+    }
+  }
+
+  // Shop owner explicitly requests a driver for an order. Flags it as seeking
+  // a driver so it's clearly surfaced in the driver pool / driver app, and it
+  // becomes visible to drivers as soon as the order is open and unassigned.
+  async requestDriverForShop(orderId) {
+    try {
+      const order = await OrderSchema.findById(orderId);
+      if (!order) throw new Error("Order not found");
+      if (order.driver_id) throw new Error("Order already has a driver assigned");
+      if (["out_for_delivery", "completed", "cancelled", "delivered"].includes(order.order_status)) {
+        throw new Error("Order is no longer open for a driver");
+      }
+      order.driver_requested = true;
+      await order.save();
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to request a driver");
     }
   }
 
@@ -1475,6 +1703,8 @@ class ChiefProfileService {
       order.order_status = "completed";
       order.delivery_fee = driverFee;
       await order.save();
+      // Free this driver's active-delivery slot for the completed order.
+      await releaseDriverDeliverySlot(order.driver_id);
 
       // Update chef earnings + track platform balance, apply auto-suspend.
       if (order.chef_id) {
@@ -1519,6 +1749,8 @@ class ChiefProfileService {
       order.delivery_step = step;
       if (step === "delivered") {
         order.order_status = "completed";
+        // Free this driver's active-delivery slot now that the delivery is done.
+        await releaseDriverDeliverySlot(order.driver_id);
       } else if (step === "picked_up" || step === "in_transit") {
         // The driver left the shop with the order; the shop's prep phase is
         // over and the delivery is now in progress.

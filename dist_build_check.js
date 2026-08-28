@@ -84187,7 +84187,8 @@ var OrderSchema = new import_mongoose3.default.Schema({
       rating: { type: Number, min: 1, max: 5, required: true }
     }, { _id: false })
   ],
-  stock_deducted: { type: Boolean, default: false }
+  stock_deducted: { type: Boolean, default: false },
+  driver_requested: { type: Boolean, default: false }
 }, { timestamps: true });
 var OrderSchema_default = import_mongoose3.default.model("Order", OrderSchema);
 
@@ -84414,6 +84415,53 @@ async function deductOrderStock(order) {
   order.stock_deducted = true;
   await order.save().catch(() => {});
   return { status: "success", outOfStock };
+}
+var ACTIVE_ORDERS_COLLECTION = "driver_active_orders";
+var ACTIVE_ORDERS_LIMIT = 3;
+async function ensureActiveOrdersIndex() {
+  try {
+    const db = import_mongoose7.default.connection.db;
+    await db.collection(ACTIVE_ORDERS_COLLECTION).createIndex({ driver_id: 1 }, { unique: true });
+  } catch (_) {}
+}
+async function acquireDriverDeliverySlot(driverId) {
+  if (!driverId)
+    return false;
+  const db = import_mongoose7.default.connection.db;
+  const coll = db.collection(ACTIVE_ORDERS_COLLECTION);
+  await ensureActiveOrdersIndex();
+  await coll.updateOne({ driver_id: driverId }, { $setOnInsert: { active: 0 } }, { upsert: true }).catch(() => {});
+  const inc = async () => await coll.findOneAndUpdate({ driver_id: driverId, active: { $lt: ACTIVE_ORDERS_LIMIT } }, { $inc: { active: 1 } }, { returnDocument: "after" });
+  let res = await inc();
+  if (res && res.value)
+    return true;
+  try {
+    const realActive = await OrderSchema_default.countDocuments({
+      driver_id: String(driverId),
+      order_status: { $nin: ["completed", "cancelled", "delivered", ""] }
+    });
+    if (realActive < ACTIVE_ORDERS_LIMIT) {
+      await coll.updateOne({ driver_id: driverId }, { $set: { active: realActive } });
+      res = await inc();
+      if (res && res.value)
+        return true;
+    }
+  } catch (_) {}
+  return false;
+}
+async function releaseDriverDeliverySlot(driverId) {
+  if (!driverId)
+    return;
+  const db = import_mongoose7.default.connection.db;
+  await db.collection(ACTIVE_ORDERS_COLLECTION).updateOne({ driver_id: driverId }, [
+    {
+      $set: {
+        active: {
+          $max: [{ $subtract: [{ $ifNull: ["$active", 0] }, 1] }, 0]
+        }
+      }
+    }
+  ]).catch(() => {});
 }
 async function applyItemRatings(itemRatings) {
   if (!Array.isArray(itemRatings) || itemRatings.length === 0)
@@ -85299,23 +85347,40 @@ class ChiefProfileService {
             throw e;
         }
       }
-      const activeCount = await OrderSchema_default.countDocuments({
-        driver_id: driverId,
-        order_status: { $nin: ["completed", "cancelled", "delivered", ""] }
-      });
-      if (activeCount >= 3) {
+      if (!await acquireDriverDeliverySlot(driverId)) {
         throw new Error("You already have 3 active deliveries. Complete one before accepting more.");
       }
-      const order = await OrderSchema_default.findOneAndUpdate({
-        _id: orderId,
-        order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
-        refund_status: { $ne: "shop_initiated" },
-        $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }]
-      }, { driver_id: driverId, order_status: "accepted", delivery_step: "accepted" }, { new: true });
-      if (!order)
-        throw new Error("Order not available or already accepted by another driver");
-      await upsertChatParticipants(String(order._id), [{ id: driverId, role: "driver", name: driverName }]);
-      return { status: "success", order };
+      try {
+        const order = await OrderSchema_default.findOneAndUpdate({
+          _id: orderId,
+          order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
+          refund_status: { $ne: "shop_initiated" },
+          $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }]
+        }, [
+          {
+            $set: {
+              driver_id: driverId,
+              delivery_step: "accepted",
+              order_status: {
+                $cond: {
+                  if: { $in: ["$order_status", ["preparing", "ready"]] },
+                  then: "$order_status",
+                  else: "accepted"
+                }
+              }
+            }
+          }
+        ], { new: true });
+        if (!order) {
+          await releaseDriverDeliverySlot(driverId);
+          throw new Error("Order not available or already accepted by another driver");
+        }
+        await upsertChatParticipants(String(order._id), [{ id: driverId, role: "driver", name: driverName }]);
+        return { status: "success", order };
+      } catch (err) {
+        await releaseDriverDeliverySlot(driverId).catch(() => {});
+        throw err;
+      }
     } catch (error) {
       throw new Error(error.message || "Failed to accept order for driver");
     }
@@ -85340,25 +85405,52 @@ class ChiefProfileService {
         if (e && e.message && e.message.includes("activation"))
           throw e;
       }
-      const order = await OrderSchema_default.findById(orderId);
-      if (!order)
-        throw new Error("Order not found");
-      if (order.driver_id)
-        throw new Error("Order already has a driver");
       const closed = ["out_for_delivery", "delivered", "completed", "cancelled"];
-      if (closed.includes(order.order_status)) {
+      const res = await OrderSchema_default.updateOne({
+        _id: orderId,
+        $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }],
+        order_status: { $nin: closed }
+      }, [
+        {
+          $set: {
+            delivery_offers: {
+              $concatArrays: [
+                {
+                  $filter: {
+                    input: { $ifNull: ["$delivery_offers", []] },
+                    as: "o",
+                    cond: {
+                      $or: [
+                        { $ne: ["$$o.status", "proposed"] },
+                        { $ne: [{ $toString: { $ifNull: ["$$o.driver_id", ""] } }, String(driverId)] }
+                      ]
+                    }
+                  }
+                },
+                [
+                  {
+                    driver_id: String(driverId),
+                    driver_name: driverName || "Driver",
+                    amount: price,
+                    status: "proposed",
+                    created_at: new Date
+                  }
+                ]
+              ]
+            }
+          }
+        }
+      ]);
+      if (!res.matchedCount) {
+        const order = await OrderSchema_default.findById(orderId);
+        if (!order)
+          throw new Error("Order not found");
+        if (order.driver_id)
+          throw new Error("Order already has a driver");
         throw new Error("Order is not open for offers");
       }
-      order.delivery_offers = (order.delivery_offers || []).filter((o) => o.status === "proposed" && String(o.driver_id) !== String(driverId));
-      order.delivery_offers.push({
-        driver_id: String(driverId),
-        driver_name: driverName || "Driver",
-        amount: price,
-        status: "proposed",
-        created_at: new Date
-      });
-      await order.save();
-      return { status: "success", order };
+      const updated = await OrderSchema_default.findById(orderId);
+      return { status: "success", order: updated };
     } catch (error) {
       throw new Error(error.message || "Failed to send offer");
     }
@@ -85376,21 +85468,103 @@ class ChiefProfileService {
       if (order.driver_id)
         throw new Error("Order already has a driver");
       if (accept) {
+        if (!await acquireDriverDeliverySlot(offer.driver_id)) {
+          throw new Error("Driver already has 3 active deliveries — this offer can't be accepted");
+        }
+        try {
+          for (const o of order.delivery_offers) {
+            o.status = o._id.toString() === offerId ? "accepted" : "rejected";
+          }
+          order.driver_id = offer.driver_id;
+          order.agreed_delivery_fee = offer.amount;
+          order.order_status = "accepted";
+          order.delivery_step = "accepted";
+          await upsertChatParticipants(String(order._id), [{ id: offer.driver_id, role: "driver", name: offer.driver_name || "" }]);
+          await order.save();
+        } catch (err) {
+          await releaseDriverDeliverySlot(offer.driver_id).catch(() => {});
+          throw err;
+        }
+      } else {
+        offer.status = "rejected";
+        await order.save();
+      }
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to respond to offer");
+    }
+  }
+  async acceptDriverOfferForShop(orderId, offerId) {
+    try {
+      const order = await OrderSchema_default.findById(orderId);
+      if (!order)
+        throw new Error("Order not found");
+      const offer = (order.delivery_offers || []).id(offerId);
+      if (!offer)
+        throw new Error("Offer not found");
+      if (offer.status !== "proposed")
+        throw new Error("Offer already answered");
+      if (order.driver_id)
+        throw new Error("Order already has a driver");
+      if (["out_for_delivery", "completed", "cancelled", "delivered"].includes(order.order_status)) {
+        throw new Error("Order is no longer open for a driver");
+      }
+      if (!await acquireDriverDeliverySlot(offer.driver_id)) {
+        throw new Error("Driver already has 3 active deliveries — this offer can't be accepted");
+      }
+      try {
         for (const o of order.delivery_offers) {
           o.status = o._id.toString() === offerId ? "accepted" : "rejected";
         }
         order.driver_id = offer.driver_id;
         order.agreed_delivery_fee = offer.amount;
-        order.order_status = "accepted";
+        if (!["ready", "preparing", "accepted"].includes(order.order_status)) {
+          order.order_status = "accepted";
+        }
         order.delivery_step = "accepted";
         await upsertChatParticipants(String(order._id), [{ id: offer.driver_id, role: "driver", name: offer.driver_name || "" }]);
-      } else {
-        offer.status = "rejected";
+        await order.save();
+      } catch (err) {
+        await releaseDriverDeliverySlot(offer.driver_id).catch(() => {});
+        throw err;
       }
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to accept driver offer");
+    }
+  }
+  async rejectDriverOfferForShop(orderId, offerId) {
+    try {
+      const order = await OrderSchema_default.findById(orderId);
+      if (!order)
+        throw new Error("Order not found");
+      const offer = (order.delivery_offers || []).id(offerId);
+      if (!offer)
+        throw new Error("Offer not found");
+      if (offer.status !== "proposed")
+        throw new Error("Offer already answered");
+      offer.status = "rejected";
       await order.save();
       return { status: "success", order };
     } catch (error) {
-      throw new Error(error.message || "Failed to respond to offer");
+      throw new Error(error.message || "Failed to reject driver offer");
+    }
+  }
+  async requestDriverForShop(orderId) {
+    try {
+      const order = await OrderSchema_default.findById(orderId);
+      if (!order)
+        throw new Error("Order not found");
+      if (order.driver_id)
+        throw new Error("Order already has a driver assigned");
+      if (["out_for_delivery", "completed", "cancelled", "delivered"].includes(order.order_status)) {
+        throw new Error("Order is no longer open for a driver");
+      }
+      order.driver_requested = true;
+      await order.save();
+      return { status: "success", order };
+    } catch (error) {
+      throw new Error(error.message || "Failed to request a driver");
     }
   }
   async getDriverOrders(driverId) {
@@ -85470,6 +85644,7 @@ class ChiefProfileService {
       order.order_status = "completed";
       order.delivery_fee = driverFee;
       await order.save();
+      await releaseDriverDeliverySlot(order.driver_id);
       if (order.chef_id) {
         const chef = await ShopOwnerProfileSchema_default.findById(order.chef_id);
         if (chef) {
@@ -85508,6 +85683,7 @@ class ChiefProfileService {
       order.delivery_step = step;
       if (step === "delivered") {
         order.order_status = "completed";
+        await releaseDriverDeliverySlot(order.driver_id);
       } else if (step === "picked_up" || step === "in_transit") {
         order.order_status = "out_for_delivery";
       }
@@ -86157,6 +86333,25 @@ class ChiefProfileController {
       res.status(400).json({ status: "error", message: e.message });
     }
   }
+  async shopRespondDeliveryOffer(req, res) {
+    try {
+      const { offer_id, accept } = req.body;
+      const result = accept ? await ChiefProfileServices_default.acceptDriverOfferForShop(req.params.id, offer_id) : await ChiefProfileServices_default.rejectDriverOfferForShop(req.params.id, offer_id);
+      res.status(200).json(result);
+    } catch (error) {
+      const e = error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
+  async requestDriverForShop(req, res) {
+    try {
+      const result = await ChiefProfileServices_default.requestDriverForShop(req.params.id);
+      res.status(200).json(result);
+    } catch (error) {
+      const e = error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
   async deliverOrderDriver(req, res) {
     try {
       const result = await ChiefProfileServices_default.deliverOrderDriver(req.params.id);
@@ -86357,6 +86552,8 @@ router.get("/order/driver/:driverId", ChiefProfileControllers_default.getDriverO
 router.patch("/order/:id/driver-accept", ChiefProfileControllers_default.acceptOrderDriver);
 router.patch("/order/:id/delivery-offer", ChiefProfileControllers_default.proposeDeliveryOffer);
 router.patch("/order/:id/delivery-offer/respond", ChiefProfileControllers_default.respondDeliveryOffer);
+router.patch("/order/:id/delivery-offer/shop-respond", ChiefProfileControllers_default.shopRespondDeliveryOffer);
+router.patch("/order/:id/request-driver", ChiefProfileControllers_default.requestDriverForShop);
 router.patch("/order/:id/driver-deliver", ChiefProfileControllers_default.deliverOrderDriver);
 router.patch("/order/:id/driver-cash-handoff", ChiefProfileControllers_default.driverCashHandoff);
 router.patch("/order/:id/driver-online-transfer", ChiefProfileControllers_default.driverOnlineTransfer);
