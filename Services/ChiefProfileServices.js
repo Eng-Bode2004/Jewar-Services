@@ -124,6 +124,18 @@ async function enrichOrderForClient(orderDoc) {
     }
 
     // ── Full text addresses (shop pickup + customer drop-off) ────────
+    // The customer's drop-off must come from the address they actually typed
+    // on THIS order (order.delivery_address) — a saved AddressService profile
+    // may be different or missing entirely, so it's only a fallback (plus the
+    // coordinates for the map).
+    const da = o.delivery_address && typeof o.delivery_address === "object" ? o.delivery_address : null;
+    const orderDeliveryParts = da
+        ? [da.label, da.street, da.city, da.country]
+            .filter((p) => p && String(p).trim() !== "")
+        : [];
+    o.order_delivery_address = orderDeliveryParts.length ? orderDeliveryParts.join(", ") : "";
+
+    let customerFull = o.order_delivery_address;
     const [shopLoc, custLoc] = await Promise.all([
         o.chef_id ? fetchAddressLocation(o.chef_id) : Promise.resolve(null),
         o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null),
@@ -136,8 +148,11 @@ async function enrichOrderForClient(orderDoc) {
     if (custLoc) {
         o.customer_latitude = custLoc.latitude;
         o.customer_longitude = custLoc.longitude;
-        o.customer_full_address = custLoc.full_text || o.delivery_address?.street || "";
+        if (!customerFull) customerFull = custLoc.full_text || o.delivery_address?.street || "";
+    } else if (!customerFull) {
+        customerFull = o.delivery_address?.street || "";
     }
+    o.customer_full_address = customerFull;
     return o;
 }
 
@@ -282,7 +297,9 @@ async function acquireDriverDeliverySlot(driverId) {
             { returnDocument: "after" }
         );
     let res = await inc();
-    if (res && res.value) return true;
+    // Driver >=7 returns the matched doc directly; older drivers wrap it in
+    // { value }. Either way the doc has an _id on success and is null on no-match.
+    if (res && (res._id || res.value)) return true;
     // The counter shows the driver is at the limit. Reconcile against the real
     // set of active orders and retry once — this self-heals slots that leaked
     // if an assigned order was later cancelled or unassigned.
@@ -297,7 +314,7 @@ async function acquireDriverDeliverySlot(driverId) {
                 { $set: { active: realActive } }
             );
             res = await inc();
-            if (res && res.value) return true;
+            if (res && (res._id || res.value)) return true;
         }
     } catch (_) {}
     return false;
@@ -1001,6 +1018,11 @@ class ChiefProfileService {
         toAccepted = !wasAccepted && update.order_status === "accepted";
       }
       const updated = await OrderSchema.findByIdAndUpdate(orderId, update, { new: true });
+      // If the shop rejected (cancelled) an order a driver had been assigned to,
+      // free that driver's active-delivery slot so it isn't leaked.
+      if (status === "rejected" && order.driver_id) {
+        await releaseDriverDeliverySlot(order.driver_id);
+      }
       // Deduct stock once the order is confirmed/accepted.
       if (toAccepted) {
         try { await deductOrderStock(updated); } catch (_) {}
@@ -1099,6 +1121,9 @@ class ChiefProfileService {
         },
         { new: true }
       );
+      // If a driver had been assigned to this (now cancelled) order, free their
+      // active-delivery slot so it isn't leaked.
+      if (order.driver_id) await releaseDriverDeliverySlot(order.driver_id);
       return { status: "success", order: updated };
     } catch (error) {
       throw new Error(error.message || "Failed to confirm refund");
@@ -1321,7 +1346,15 @@ class ChiefProfileService {
             }
           } catch (_) {}
         }
-        // Attach shop + customer coordinates & full text addresses for the map
+        // Attach shop + customer coordinates & full text addresses for the map.
+        // The customer's drop-off text must come from THIS order's
+        // delivery_address (what they typed); the saved AddressService profile
+        // is only a map-coordinates fallback.
+        const da = o.delivery_address && typeof o.delivery_address === "object" ? o.delivery_address : null;
+        const orderDeliveryParts = da
+            ? [da.label, da.street, da.city, da.country].filter((p) => p && String(p).trim() !== "")
+            : [];
+        let customerFull = orderDeliveryParts.length ? orderDeliveryParts.join(", ") : "";
         const [shopLoc, custLoc] = await Promise.all([
           o.chef_id ? fetchAddressLocation(o.chef_id) : Promise.resolve(null),
           o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null),
@@ -1334,8 +1367,11 @@ class ChiefProfileService {
         if (custLoc) {
           o.customer_latitude = custLoc.latitude;
           o.customer_longitude = custLoc.longitude;
-          o.customer_full_address = custLoc.full_text || o.delivery_address?.street || "";
+          if (!customerFull) customerFull = custLoc.full_text || o.delivery_address?.street || "";
+        } else if (!customerFull) {
+          customerFull = o.delivery_address?.street || "";
         }
+        o.customer_full_address = customerFull;
         return o;
       }));
 
@@ -1398,7 +1434,7 @@ class ChiefProfileService {
               },
             },
           ],
-          { new: true }
+          { new: true, updatePipeline: true }
         );
         if (!order) {
           // Claim failed — free the reserved slot so it isn't leaked.
@@ -1482,7 +1518,8 @@ class ChiefProfileService {
               },
             },
           },
-        ]
+        ],
+        { updatePipeline: true }
       );
 
       if (!res.matchedCount) {
@@ -1653,7 +1690,15 @@ class ChiefProfileService {
             }
           } catch (_) {}
         }
-        // Attach shop + customer coordinates & full text addresses for the map
+        // Attach shop + customer coordinates & full text addresses for the map.
+        // The customer's drop-off text must come from THIS order's
+        // delivery_address (what they typed); the saved AddressService profile
+        // is only a map-coordinates fallback.
+        const da = o.delivery_address && typeof o.delivery_address === "object" ? o.delivery_address : null;
+        const orderDeliveryParts = da
+            ? [da.label, da.street, da.city, da.country].filter((p) => p && String(p).trim() !== "")
+            : [];
+        let customerFull = orderDeliveryParts.length ? orderDeliveryParts.join(", ") : "";
         const [shopLoc, custLoc] = await Promise.all([
           o.chef_id ? fetchAddressLocation(o.chef_id) : Promise.resolve(null),
           o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null),
@@ -1666,8 +1711,11 @@ class ChiefProfileService {
         if (custLoc) {
           o.customer_latitude = custLoc.latitude;
           o.customer_longitude = custLoc.longitude;
-          o.customer_full_address = custLoc.full_text || o.delivery_address?.street || "";
+          if (!customerFull) customerFull = custLoc.full_text || o.delivery_address?.street || "";
+        } else if (!customerFull) {
+          customerFull = o.delivery_address?.street || "";
         }
+        o.customer_full_address = customerFull;
         return o;
       }));
       return { status: "success", orders: enriched };
