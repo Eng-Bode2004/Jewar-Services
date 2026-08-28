@@ -1314,7 +1314,7 @@ class ChiefProfileService {
           if (dRes.ok) {
             const dData = await dRes.json();
             const driver = dData.profile || dData.driver || dData;
-            if (!driver.online_status || !driver.Is_Verified) eligible = false;
+            if (!driver.online_status || !(driver.Is_Verified || driver.Verification_Status === "approved")) eligible = false;
             driverRating = driver.rating || 0;
             // Extract driver city from payment_method or use current_location city lookup
             // We'll use the driver's location to filter orders by matching delivery_address.city
@@ -1442,7 +1442,7 @@ class ChiefProfileService {
             const dData = await dRes.json();
             const driver = dData.profile || dData.driver || dData;
             driverName = driver.name || driver.full_name || "";
-            if (!driver.online_status || !driver.Is_Verified) {
+            if (!driver.online_status || !(driver.Is_Verified || driver.Verification_Status === "approved")) {
               throw new Error("Go online and complete account activation to accept orders");
             }
           }
@@ -1516,7 +1516,7 @@ class ChiefProfileService {
         if (dRes.ok) {
           const dData = await dRes.json();
           const driver = dData.profile || dData.driver || dData;
-          if (!driver.online_status || !driver.Is_Verified) {
+          if (!driver.online_status || !(driver.Is_Verified || driver.Verification_Status === "approved")) {
             throw new Error("Go online and complete account activation to send offers");
           }
         }
