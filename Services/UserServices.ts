@@ -373,11 +373,16 @@ class UserServices {
         async function deleteUrl(url?: string | null) {
             if (!url) return;
             try {
-                await fetch(`${IMAGES_SVC}/delete-by-url`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url })
-                });
+                // Best-effort cleanup: enforce a hard timeout so a slow/hung
+                // Images service can never block account deletion.
+                await Promise.race([
+                    fetch(`${IMAGES_SVC}/delete-by-url`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("delete URL timeout")), 8000)),
+                ]);
             } catch(e) {}
         }
         const oid = (v: unknown): mongoose.Types.ObjectId | null => {
@@ -424,7 +429,7 @@ class UserServices {
                 dProfile?.documents?.id_back,
                 dProfile?.documents?.background_check,
             ];
-            for (const u of dUrls) await deleteUrl(u);
+            await Promise.allSettled(dUrls.map((u) => deleteUrl(u)));
 
             // Detach driver from orders (driver_id stored as string or ObjectId)
             const driverMatch = didOid ? { $or: [{ driver_id: didStr }, { driver_id: didOid }] } : { driver_id: didStr };
@@ -464,7 +469,7 @@ class UserServices {
             const ads = await db.collection('ads').find(adMatch, { projection: { image_url: 1 } }).toArray();
             for (const a of ads) if (a?.image_url) sUrls.push(a.image_url);
 
-            for (const u of sUrls) await deleteUrl(u);
+            await Promise.allSettled(sUrls.map((u) => deleteUrl(u)));
 
             await db.collection('dishes').deleteMany(dishMatch);
             await db.collection('ads').deleteMany(adMatch);
