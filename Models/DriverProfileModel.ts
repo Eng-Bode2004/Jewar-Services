@@ -112,6 +112,12 @@ const DriverProfileSchema = new mongoose.Schema({
         max: 5,
     },
 
+    rating_count: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+
     total_deliveries: {
         type: Number,
         default: 0,

@@ -228,10 +228,20 @@ class DriverProfileService {
 
     async updateRating(profileId, rating) {
         try {
+            if (rating === undefined || rating === null) throw new Error("rating is required");
             const profile = await DriverProfileModel.findById(profileId);
             if (!profile) throw new Error("Profile not found");
-            const newRating = profile.rating === 0 ? rating : (profile.rating + rating) / 2;
-            const updated = await DriverProfileModel.findByIdAndUpdate(profileId, { rating: newRating }, { new: true });
+            const r = Number(rating);
+            if (!Number.isFinite(r) || r < 1 || r > 5) throw new Error("rating must be between 1 and 5");
+            const count = profile.rating_count || 0;
+            const newRating = count === 0
+                ? r
+                : Math.round(((profile.rating * count) + r) / (count + 1) * 100) / 100;
+            const updated = await DriverProfileModel.findByIdAndUpdate(
+                profileId,
+                { rating: newRating, rating_count: count + 1 },
+                { new: true }
+            );
             return { status: "success", rating: updated.rating };
         } catch (error) {
             throw new Error(error.message || "Failed to update rating");
