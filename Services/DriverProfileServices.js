@@ -73,31 +73,31 @@ class DriverProfileService {
             async function deleteUrl(url) {
                 if(!url) return;
                 try {
-                    await fetch(`${IMAGES_SVC}/delete-by-url`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url })
-                    });
+                    // Best-effort cleanup: hard timeout so a slow/hung Images
+                    // service can never block profile deletion.
+                    await Promise.race([
+                        fetch(`${IMAGES_SVC}/delete-by-url`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url })
+                        }),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error("delete URL timeout")), 8000)),
+                    ]);
                 } catch(e) {}
             }
 
-            // 1. Delete profile images
-            const imgFields = ['profile_image'];
-            for(let f of imgFields) {
-                if(profile[f]) await deleteUrl(profile[f]);
-            }
-            if(profile.documents) {
-                if(profile.documents.id_front) await deleteUrl(profile.documents.id_front);
-                if(profile.documents.id_back) await deleteUrl(profile.documents.id_back);
-            }
-            if(profile.license) {
-                if(profile.license.front_image) await deleteUrl(profile.license.front_image);
-                if(profile.license.back_image) await deleteUrl(profile.license.back_image);
-                if(profile.license.vehicle_license_image) await deleteUrl(profile.license.vehicle_license_image);
-            }
-            if(profile.vehicle && profile.vehicle.image) {
-                await deleteUrl(profile.vehicle.image);
-            }
+            // 1. Delete profile images (concurrently, hard-timed out so a slow
+            //    Images service can never block profile deletion)
+            const dUrls = [
+                profile.profile_image,
+                profile?.documents?.id_front,
+                profile?.documents?.id_back,
+                profile?.license?.front_image,
+                profile?.license?.back_image,
+                profile?.license?.vehicle_license_image,
+                profile?.vehicle?.image,
+            ];
+            await Promise.allSettled(dUrls.map((u) => deleteUrl(u)));
 
             const db = mongoose.connection.db;
 
