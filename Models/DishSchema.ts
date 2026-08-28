@@ -67,6 +67,10 @@ const DishSchema = new mongoose.Schema({
     stock_type: { type: String, enum: ["daily", "regular"], default: "regular" },
     available: { type: Boolean, default: true },
 
+    // ── Ratings (running average updated from completed customer orders) ──
+    rating: { type: Number, default: 0, min: 0, max: 5 },
+    rating_count: { type: Number, default: 0, min: 0 },
+
     // ── Image ──
     image: {
         type: String,
