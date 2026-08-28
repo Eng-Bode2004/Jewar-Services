@@ -607,8 +607,8 @@ class ChiefProfileController {
 
   async rateOrder(req:Request, res:Response) {
     try {
-      const { rating, driver_rating, comment } = req.body;
-      const result = await ChiefProfileServices.rateOrder(req.params.id, rating, driver_rating, comment);
+      const { rating, driver_rating, comment, item_ratings } = req.body;
+      const result = await ChiefProfileServices.rateOrder(req.params.id, rating, driver_rating, comment, item_ratings);
       res.status(200).json(result);
     } catch (error:unknown) {
       res.status(400).json({

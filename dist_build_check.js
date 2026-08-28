@@ -84180,7 +84180,14 @@ var OrderSchema = new import_mongoose3.default.Schema({
   rejection_reason: { type: String },
   rating: { type: Number, min: 1, max: 5 },
   driver_rating: { type: Number, min: 1, max: 5 },
-  review_comment: { type: String }
+  review_comment: { type: String },
+  item_ratings: [
+    new import_mongoose3.default.Schema({
+      dish_id: { type: String, required: true },
+      rating: { type: Number, min: 1, max: 5, required: true }
+    }, { _id: false })
+  ],
+  stock_deducted: { type: Boolean, default: false }
 }, { timestamps: true });
 var OrderSchema_default = import_mongoose3.default.model("Order", OrderSchema);
 
@@ -84347,6 +84354,97 @@ async function upsertChatParticipants(orderId, participants) {
       $addToSet: { participants: { $each: filtered } }
     }, { upsert: true, new: true });
   } catch (_) {}
+}
+function todayStr() {
+  const now = new Date;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+async function assertShopOpen(chefId) {
+  if (!chefId)
+    return;
+  const chef = await ShopOwnerProfileSchema_default.findById(chefId).select("shop_open");
+  if (chef && chef.shop_open === false) {
+    throw new Error("This shop is currently closed and cannot take orders");
+  }
+}
+async function deductOrderStock(order) {
+  if (!order || order.stock_deducted || !Array.isArray(order.items) || order.items.length === 0) {
+    return { status: "skipped" };
+  }
+  const db = import_mongoose7.default.connection.db;
+  const date = todayStr();
+  const outOfStock = [];
+  for (const item of order.items) {
+    const qty = Number(item.qty) || 0;
+    if (!item.dish_id || qty <= 0)
+      continue;
+    let dish = null;
+    try {
+      dish = await db.collection("dishes").findOne({ _id: import_mongoose7.default.Types.ObjectId.isValid(item.dish_id) ? new import_mongoose7.default.Types.ObjectId(item.dish_id) : item.dish_id });
+    } catch (_) {}
+    if (dish && dish.stock_type === "daily") {
+      await DailyDishAvailability.updateOne({ dish_id: dish._id, chief_id: order.chef_id ? new import_mongoose7.default.Types.ObjectId(order.chef_id) : dish.Owner_id, date }, { $inc: { pieces_sold: qty } }, { upsert: false }).catch(() => {});
+      continue;
+    }
+    const id = dish && dish._id || item.dish_id;
+    try {
+      const res = await db.collection("dishes").updateOne({ _id: id }, [
+        {
+          $set: {
+            stock_quantity: { $max: [0, { $subtract: ["$stock_quantity", qty] }] },
+            available: {
+              $cond: [
+                { $gt: [{ $subtract: ["$stock_quantity", qty] }, 0] },
+                "$available",
+                false
+              ]
+            }
+          }
+        }
+      ]);
+      if (res.modifiedCount || res.matchedCount) {
+        try {
+          const after = await db.collection("dishes").findOne({ _id: id }, { projection: { stock_quantity: 1, available: 1 } });
+          if (after && after.stock_quantity <= 0)
+            outOfStock.push(item.dish_id);
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+  order.stock_deducted = true;
+  await order.save().catch(() => {});
+  return { status: "success", outOfStock };
+}
+async function applyItemRatings(itemRatings) {
+  if (!Array.isArray(itemRatings) || itemRatings.length === 0)
+    return;
+  const db = import_mongoose7.default.connection.db;
+  for (const ir of itemRatings) {
+    const dId = ir.dish_id;
+    const r = Number(ir.rating);
+    if (!dId || !Number.isFinite(r) || r < 1 || r > 5)
+      continue;
+    try {
+      await db.collection("dishes").updateOne({ _id: dId }, [
+        {
+          $set: {
+            rating: {
+              $divide: [
+                {
+                  $add: [
+                    { $multiply: [{ $ifNull: ["$rating", 0] }, { $ifNull: ["$rating_count", 0] }] },
+                    r
+                  ]
+                },
+                { $add: [{ $ifNull: ["$rating_count", 0] }, 1] }
+              ]
+            },
+            rating_count: { $add: [{ $ifNull: ["$rating_count", 0] }, 1] }
+          }
+        }
+      ]);
+    } catch (_) {}
+  }
 }
 
 class ChiefProfileService {
@@ -84725,6 +84823,22 @@ class ChiefProfileService {
   }
   async createOrder(data) {
     try {
+      await assertShopOpen(data.chef_id);
+      if (Array.isArray(data.items) && data.items.length && import_mongoose7.default.connection.db) {
+        const db = import_mongoose7.default.connection.db;
+        for (const item of data.items) {
+          const dishId = item.dish_id;
+          if (!dishId)
+            continue;
+          let dish = null;
+          try {
+            dish = await db.collection("dishes").findOne({ _id: import_mongoose7.default.Types.ObjectId.isValid(dishId) ? new import_mongoose7.default.Types.ObjectId(dishId) : dishId }, { projection: { available: 1, stock_quantity: 1, stock_type: 1 } });
+          } catch (_) {}
+          if (dish && dish.available === false) {
+            throw new Error("One of the items you selected is sold out");
+          }
+        }
+      }
       const order = await OrderSchema_default.create(data);
       const participants = [];
       if (data.customer_id) {
@@ -84860,13 +84974,24 @@ class ChiefProfileService {
       const order = await OrderSchema_default.findOne({ _id: orderId, chef_id: chefId });
       if (!order)
         throw new Error("Order not found for this shop");
+      if (status === "approved") {
+        await assertShopOpen(chefId);
+      }
       const update = { transaction_status: status };
+      const wasAccepted = order.order_status === "accepted";
+      let toAccepted = false;
       if (status === "rejected") {
         update.order_status = "cancelled";
       } else {
         update.order_status = order.order_status && order.order_status !== "pending" ? order.order_status : "accepted";
+        toAccepted = !wasAccepted && update.order_status === "accepted";
       }
       const updated = await OrderSchema_default.findByIdAndUpdate(orderId, update, { new: true });
+      if (toAccepted) {
+        try {
+          await deductOrderStock(updated);
+        } catch (_) {}
+      }
       return { status: "success", order: updated };
     } catch (error) {
       throw new Error(error.message || "Failed to verify payment");
@@ -84874,10 +84999,20 @@ class ChiefProfileService {
   }
   async acceptOrder(orderId) {
     try {
-      const order = await OrderSchema_default.findByIdAndUpdate(orderId, { order_status: "accepted" }, { new: true });
+      const order = await OrderSchema_default.findById(orderId);
       if (!order)
         throw new Error("Order not found");
-      return { status: "success", order };
+      if (order.order_status === "accepted") {
+        return { status: "success", order };
+      }
+      await assertShopOpen(order.chef_id);
+      const updated = await OrderSchema_default.findByIdAndUpdate(orderId, { order_status: "accepted" }, { new: true });
+      if (!updated)
+        throw new Error("Order not found");
+      try {
+        await deductOrderStock(updated);
+      } catch (_) {}
+      return { status: "success", order: updated };
     } catch (error) {
       throw new Error(error.message || "Failed to accept order");
     }
@@ -85441,7 +85576,7 @@ class ChiefProfileService {
       throw new Error(error.message || "Failed to confirm driver payment");
     }
   }
-  async rateOrder(orderId, rating, driverRating, comment) {
+  async rateOrder(orderId, rating, driverRating, comment, itemRatings) {
     try {
       const order = await OrderSchema_default.findById(orderId);
       if (!order)
@@ -85453,7 +85588,15 @@ class ChiefProfileService {
         order.driver_rating = driverRating;
       if (comment)
         order.review_comment = comment;
+      if (Array.isArray(itemRatings) && itemRatings.length) {
+        order.item_ratings = itemRatings.filter((ir) => ir && ir.dish_id && Number.isFinite(Number(ir.rating))).map((ir) => ({ dish_id: String(ir.dish_id), rating: Number(ir.rating) }));
+      }
       await order.save();
+      if (Array.isArray(itemRatings) && itemRatings.length) {
+        try {
+          await applyItemRatings(order.item_ratings);
+        } catch (_) {}
+      }
       if (driverRating && order.driver_id) {
         try {
           await fetch(`${DRIVER_SERVICE_URL}/${order.driver_id}/rating`, {
@@ -86066,8 +86209,8 @@ class ChiefProfileController {
   }
   async rateOrder(req, res) {
     try {
-      const { rating, driver_rating, comment } = req.body;
-      const result = await ChiefProfileServices_default.rateOrder(req.params.id, rating, driver_rating, comment);
+      const { rating, driver_rating, comment, item_ratings } = req.body;
+      const result = await ChiefProfileServices_default.rateOrder(req.params.id, rating, driver_rating, comment, item_ratings);
       res.status(200).json(result);
     } catch (error) {
       res.status(400).json({

@@ -90,6 +90,19 @@ const OrderSchema = new mongoose.Schema({
   rating: { type: Number, min: 1, max: 5 },
   driver_rating: { type: Number, min: 1, max: 5 },
   review_comment: { type: String },
+  // Per-item (dish) ratings given by the customer when they rate the order.
+  item_ratings: [
+    new mongoose.Schema(
+      {
+        dish_id: { type: String, required: true },
+        rating: { type: Number, min: 1, max: 5, required: true },
+      },
+      { _id: false }
+    ),
+  ],
+  // True once the ordered items' stock has been deducted from the shop's
+  // inventory. Guards against double-deduction across retries/duplicate calls.
+  stock_deducted: { type: Boolean, default: false },
 }, { timestamps: true });
 
 export default mongoose.model("Order", OrderSchema);

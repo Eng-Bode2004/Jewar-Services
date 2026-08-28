@@ -163,6 +163,117 @@ async function upsertChatParticipants(orderId, participants) {
     }
 }
 
+// ── Stock / shop-status / item-rating helpers (share the service's DB) ─────
+
+function todayStr() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+// Throw unless the given shop is open and accepting orders.
+async function assertShopOpen(chefId) {
+    if (!chefId) return;
+    const chef = await ShopOwnerProfileSchema.findById(chefId).select("shop_open");
+    if (chef && chef.shop_open === false) {
+        throw new Error("This shop is currently closed and cannot take orders");
+    }
+}
+
+// Deduct the ordered quantities from the shop inventory:
+//  - "daily" (food) items decrement that day's DailyDishAvailability.pieces_sold,
+//  - regular inventory items decrement the Dish's stock_quantity and are marked
+//    unavailable when they run out.
+// Guarded by the order's stock_deducted flag so it only runs once.
+async function deductOrderStock(order) {
+    if (!order || order.stock_deducted || !Array.isArray(order.items) || order.items.length === 0) {
+        return { status: "skipped" };
+    }
+    const db = mongoose.connection.db;
+    const date = todayStr();
+    const outOfStock = [];
+    for (const item of order.items) {
+        const qty = Number(item.qty) || 0;
+        if (!item.dish_id || qty <= 0) continue;
+        let dish = null;
+        try {
+            dish = await db.collection("dishes").findOne({ _id: mongoose.Types.ObjectId.isValid(item.dish_id) ? new mongoose.Types.ObjectId(item.dish_id) : item.dish_id });
+        } catch (_) { /* fall back below */ }
+        if (dish && dish.stock_type === "daily") {
+            await DailyDishAvailability.updateOne(
+                { dish_id: dish._id, chief_id: order.chef_id ? new mongoose.Types.ObjectId(order.chef_id) : dish.Owner_id, date },
+                { $inc: { pieces_sold: qty } },
+                { upsert: false }
+            ).catch(() => {});
+            continue;
+        }
+        // Regular inventory (or untyped) item → decrement Dish stock_quantity.
+        const id = (dish && dish._id) || item.dish_id;
+        try {
+            const res = await db.collection("dishes").updateOne(
+                { _id: id },
+                [
+                    {
+                        $set: {
+                            stock_quantity: { $max: [0, { $subtract: ["$stock_quantity", qty] }] },
+                            available: {
+                                $cond: [
+                                    { $gt: [{ $subtract: ["$stock_quantity", qty] }, 0] },
+                                    "$available",
+                                    false,
+                                ],
+                            },
+                        },
+                    },
+                ]
+            );
+            if (res.modifiedCount || res.matchedCount) {
+                try {
+                    const after = await db.collection("dishes").findOne({ _id: id }, { projection: { stock_quantity: 1, available: 1 } });
+                    if (after && after.stock_quantity <= 0) outOfStock.push(item.dish_id);
+                } catch (_) {}
+            }
+        } catch (_) {}
+    }
+    order.stock_deducted = true;
+    await order.save().catch(() => {});
+    return { status: "success", outOfStock };
+}
+
+// Apply per-item (dish) ratings from a completed order to each dish's running
+// average. Uses a count so the average converges correctly.
+async function applyItemRatings(itemRatings) {
+    if (!Array.isArray(itemRatings) || itemRatings.length === 0) return;
+    const db = mongoose.connection.db;
+    for (const ir of itemRatings) {
+        const dId = ir.dish_id;
+        const r = Number(ir.rating);
+        if (!dId || !Number.isFinite(r) || r < 1 || r > 5) continue;
+        try {
+            await db.collection("dishes").updateOne(
+                { _id: dId },
+                [
+                    {
+                        $set: {
+                            rating: {
+                                $divide: [
+                                    {
+                                        $add: [
+                                            { $multiply: [{ $ifNull: ["$rating", 0] }, { $ifNull: ["$rating_count", 0] }] },
+                                            r,
+                                        ],
+                                    },
+                                    { $add: [{ $ifNull: ["$rating_count", 0] }, 1] },
+                                ],
+                            },
+                            rating_count: { $add: [{ $ifNull: ["$rating_count", 0] }, 1] },
+                        },
+                    },
+                ]
+            );
+        } catch (_) {}
+    }
+}
+
 class ChiefProfileService {
 
     // 1ï¸âƒ£ Create a new Chief Profile
@@ -633,6 +744,25 @@ class ChiefProfileService {
 
   async createOrder(data) {
     try {
+      // A customer can't place an order with a shop that is currently closed.
+      await assertShopOpen(data.chef_id);
+
+      // Reject if an ordered item is unavailable or its stock is exhausted.
+      if (Array.isArray(data.items) && data.items.length && mongoose.connection.db) {
+        const db = mongoose.connection.db;
+        for (const item of data.items) {
+          const dishId = item.dish_id;
+          if (!dishId) continue;
+          let dish = null;
+          try {
+            dish = await db.collection("dishes").findOne({ _id: mongoose.Types.ObjectId.isValid(dishId) ? new mongoose.Types.ObjectId(dishId) : dishId }, { projection: { available: 1, stock_quantity: 1, stock_type: 1 } });
+          } catch (_) {}
+          if (dish && dish.available === false) {
+            throw new Error("One of the items you selected is sold out");
+          }
+        }
+      }
+
       const order = await OrderSchema.create(data);
       // Seed the order's chat so the customer and shop are participants from the
       // start — needed for each side's in-app chat popup poller to work.
@@ -773,15 +903,26 @@ class ChiefProfileService {
       }
       const order = await OrderSchema.findOne({ _id: orderId, chef_id: chefId });
       if (!order) throw new Error("Order not found for this shop");
+      if (status === "approved") {
+        // Closed shops can't confirm (and thereby accept) new orders.
+        await assertShopOpen(chefId);
+      }
       const update = { transaction_status: status };
+      const wasAccepted = order.order_status === "accepted";
+      let toAccepted = false;
       if (status === "rejected") {
         update.order_status = "cancelled";
       } else {
         update.order_status = order.order_status && order.order_status !== "pending"
           ? order.order_status
           : "accepted";
+        toAccepted = !wasAccepted && update.order_status === "accepted";
       }
       const updated = await OrderSchema.findByIdAndUpdate(orderId, update, { new: true });
+      // Deduct stock once the order is confirmed/accepted.
+      if (toAccepted) {
+        try { await deductOrderStock(updated); } catch (_) {}
+      }
       return { status: "success", order: updated };
     } catch (error) {
       throw new Error(error.message || "Failed to verify payment");
@@ -790,13 +931,20 @@ class ChiefProfileService {
 
   async acceptOrder(orderId) {
     try {
-      const order = await OrderSchema.findByIdAndUpdate(
+      const order = await OrderSchema.findById(orderId);
+      if (!order) throw new Error("Order not found");
+      if (order.order_status === "accepted") {
+        return { status: "success", order };
+      }
+      await assertShopOpen(order.chef_id);
+      const updated = await OrderSchema.findByIdAndUpdate(
         orderId,
         { order_status: "accepted" },
         { new: true }
       );
-      if (!order) throw new Error("Order not found");
-      return { status: "success", order };
+      if (!updated) throw new Error("Order not found");
+      try { await deductOrderStock(updated); } catch (_) {}
+      return { status: "success", order: updated };
     } catch (error) {
       throw new Error(error.message || "Failed to accept order");
     }
@@ -1452,7 +1600,7 @@ class ChiefProfileService {
     }
   }
 
-  async rateOrder(orderId, rating, driverRating, comment) {
+  async rateOrder(orderId, rating, driverRating, comment, itemRatings) {
     try {
       const order = await OrderSchema.findById(orderId);
       if (!order) throw new Error("Order not found");
@@ -1461,7 +1609,17 @@ class ChiefProfileService {
       order.rating = rating;
       if (driverRating) order.driver_rating = driverRating;
       if (comment) order.review_comment = comment;
+      if (Array.isArray(itemRatings) && itemRatings.length) {
+        order.item_ratings = itemRatings
+          .filter((ir) => ir && ir.dish_id && Number.isFinite(Number(ir.rating)))
+          .map((ir) => ({ dish_id: String(ir.dish_id), rating: Number(ir.rating) }));
+      }
       await order.save();
+
+      // Persist per-item (dish) ratings to each dish's running average.
+      if (Array.isArray(itemRatings) && itemRatings.length) {
+        try { await applyItemRatings(order.item_ratings); } catch (_) {}
+      }
 
       // Update driver rating via API
       if (driverRating && order.driver_id) {
