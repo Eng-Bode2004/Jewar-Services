@@ -109,6 +109,7 @@ async function enrichOrderForClient(orderDoc) {
                 o.customer_phone = cust.phone || "";
                 o.customer_email = cust.email || "";
                 o.customer_avatar = cust.avatar || "";
+              o.customer_profile_address = cust.address || "";
             }
         } catch (_) {}
     }
@@ -150,14 +151,16 @@ async function enrichOrderForClient(orderDoc) {
         o.shop_latitude = shopLoc.latitude;
         o.shop_longitude = shopLoc.longitude;
         o.shop_full_address = shopLoc.full_text || o.chef_address || "";
-    }
+      } else {
+        o.shop_full_address = o.chef_address || "";
+      }
     if (custLoc) {
         o.customer_latitude = custLoc.latitude;
         o.customer_longitude = custLoc.longitude;
-        if (!customerFull) customerFull = custLoc.full_text || o.delivery_address?.street || "";
-    } else if (!customerFull) {
-        customerFull = o.delivery_address?.street || "";
-    }
+        if (!customerFull) customerFull = custLoc.full_text || o.customer_profile_address || o.delivery_address?.street || "";
+      } else if (!customerFull) {
+        customerFull = o.customer_profile_address || o.delivery_address?.street || "";
+      }
     o.customer_full_address = customerFull;
     return o;
 }
@@ -1247,7 +1250,7 @@ class ChiefProfileService {
     }
   }
 
-  // â”€â”€ Admin Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ────────────────────────────────────────────────────────────────── Admin Orders ───────────────────────────────────────────────────────────
 
   async getAllOrders() {
     try {
@@ -1278,7 +1281,7 @@ class ChiefProfileService {
         {
           order_status: "pending",
           delivery_step: "none",
-          refund_status: { $ne: "shop_initiated" },
+          refund_status: { $ne: "shop_initiated" }, delivery_offers: { $not: { $elemMatch: { driver_id: driverId, status: "rejected" } } },
           createdAt: { $lte: expiredBefore },
           $or: [
             { driver_id: { $exists: false } },
@@ -1332,7 +1335,7 @@ class ChiefProfileService {
       const baseQuery = {
         order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
         // Hide orders the shop declined and is refunding (awaiting customer confirmation).
-        refund_status: { $ne: "shop_initiated" },
+        refund_status: { $ne: "shop_initiated" }, delivery_offers: { $not: { $elemMatch: { driver_id: driverId, status: "rejected" } } },
         $or: [
           { driver_id: { $exists: false } },
           { driver_id: null },
@@ -1383,6 +1386,7 @@ class ChiefProfileService {
               o.customer_phone = cust.phone || "";
               o.customer_email = cust.email || "";
               o.customer_avatar = cust.avatar || "";
+              o.customer_profile_address = cust.address || "";
             }
           } catch (_) {}
         }
@@ -1400,17 +1404,19 @@ class ChiefProfileService {
           o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null),
         ]);
         if (shopLoc) {
-          o.shop_latitude = shopLoc.latitude;
-          o.shop_longitude = shopLoc.longitude;
-          o.shop_full_address = shopLoc.full_text || o.chef_address || "";
-        }
+        o.shop_latitude = shopLoc.latitude;
+        o.shop_longitude = shopLoc.longitude;
+        o.shop_full_address = shopLoc.full_text || o.chef_address || "";
+      } else {
+        o.shop_full_address = o.chef_address || "";
+      }
         if (custLoc) {
           o.customer_latitude = custLoc.latitude;
           o.customer_longitude = custLoc.longitude;
-          if (!customerFull) customerFull = custLoc.full_text || o.delivery_address?.street || "";
-        } else if (!customerFull) {
-          customerFull = o.delivery_address?.street || "";
-        }
+          if (!customerFull) customerFull = custLoc.full_text || o.customer_profile_address || o.delivery_address?.street || "";
+      } else if (!customerFull) {
+        customerFull = o.customer_profile_address || o.delivery_address?.street || "";
+      }
         o.customer_full_address = customerFull;
         return o;
       }));
@@ -1453,7 +1459,7 @@ class ChiefProfileService {
           {
             _id: orderId,
             order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
-            refund_status: { $ne: "shop_initiated" },
+            refund_status: { $ne: "shop_initiated" }, delivery_offers: { $not: { $elemMatch: { driver_id: driverId, status: "rejected" } } },
             $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }],
           },
           [
@@ -1728,6 +1734,7 @@ class ChiefProfileService {
               o.customer_phone = cust.phone || "";
               o.customer_email = cust.email || "";
               o.customer_avatar = cust.avatar || "";
+              o.customer_profile_address = cust.address || "";
             }
           } catch (_) {}
         }
@@ -1745,17 +1752,19 @@ class ChiefProfileService {
           o.customer_id ? fetchAddressLocation(o.customer_id) : Promise.resolve(null),
         ]);
         if (shopLoc) {
-          o.shop_latitude = shopLoc.latitude;
-          o.shop_longitude = shopLoc.longitude;
-          o.shop_full_address = shopLoc.full_text || o.chef_address || "";
-        }
+        o.shop_latitude = shopLoc.latitude;
+        o.shop_longitude = shopLoc.longitude;
+        o.shop_full_address = shopLoc.full_text || o.chef_address || "";
+      } else {
+        o.shop_full_address = o.chef_address || "";
+      }
         if (custLoc) {
           o.customer_latitude = custLoc.latitude;
           o.customer_longitude = custLoc.longitude;
-          if (!customerFull) customerFull = custLoc.full_text || o.delivery_address?.street || "";
-        } else if (!customerFull) {
-          customerFull = o.delivery_address?.street || "";
-        }
+          if (!customerFull) customerFull = custLoc.full_text || o.customer_profile_address || o.delivery_address?.street || "";
+      } else if (!customerFull) {
+        customerFull = o.customer_profile_address || o.delivery_address?.street || "";
+      }
         o.customer_full_address = customerFull;
         return o;
       }));
