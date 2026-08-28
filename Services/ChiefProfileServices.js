@@ -1281,7 +1281,7 @@ class ChiefProfileService {
         {
           order_status: "pending",
           delivery_step: "none",
-          refund_status: { $ne: "shop_initiated" }, delivery_offers: { $not: { $elemMatch: { driver_id: driverId, status: "rejected" } } },
+          refund_status: { $ne: "shop_initiated" },
           createdAt: { $lte: expiredBefore },
           $or: [
             { driver_id: { $exists: false } },
@@ -1335,7 +1335,8 @@ class ChiefProfileService {
       const baseQuery = {
         order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
         // Hide orders the shop declined and is refunding (awaiting customer confirmation).
-        refund_status: { $ne: "shop_initiated" }, delivery_offers: { $not: { $elemMatch: { driver_id: driverId, status: "rejected" } } },
+        refund_status: { $ne: "shop_initiated" },
+        delivery_offers: { $not: { $elemMatch: { driver_id: driverId, status: "rejected" } } },
         $or: [
           { driver_id: { $exists: false } },
           { driver_id: null },
@@ -1459,7 +1460,7 @@ class ChiefProfileService {
           {
             _id: orderId,
             order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
-            refund_status: { $ne: "shop_initiated" }, delivery_offers: { $not: { $elemMatch: { driver_id: driverId, status: "rejected" } } },
+            refund_status: { $ne: "shop_initiated" },
             $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }],
           },
           [
