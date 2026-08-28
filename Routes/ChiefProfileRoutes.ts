@@ -142,7 +142,14 @@ router.patch("/order/:id/driver-accept", ShopOwnerProfileControllers.acceptOrder
 router.patch("/order/:id/delivery-offer", ShopOwnerProfileControllers.proposeDeliveryOffer);
 
 // Customer: accept/reject a driver's delivery offer
-router.patch("/order/:id/delivery-offer/respond", ShopOwnerProfileControllers.respondDeliveryOffer);
+  router.patch("/order/:id/delivery-offer/respond", ShopOwnerProfileControllers.respondDeliveryOffer);
+
+// Shop owner: accept/reject a driver's offer for a shop order (keeps order status)
+router.patch("/order/:id/delivery-offer/shop-respond", ShopOwnerProfileControllers.shopRespondDeliveryOffer);
+
+// Shop owner: explicitly request a driver for an order
+router.patch("/order/:id/request-driver", ShopOwnerProfileControllers.requestDriverForShop);
+
 
 // Driver: deliver an order
 router.patch("/order/:id/driver-deliver", ShopOwnerProfileControllers.deliverOrderDriver);

@@ -549,6 +549,31 @@ class ChiefProfileController {
     }
   }
 
+  // Shop owner accepts/rejects a driver's delivery offer for a shop order.
+  async shopRespondDeliveryOffer(req:Request, res:Response) {
+    try {
+      const { offer_id, accept } = req.body;
+      const result = accept
+        ? await ChiefProfileServices.acceptDriverOfferForShop(req.params.id, offer_id)
+        : await ChiefProfileServices.rejectDriverOfferForShop(req.params.id, offer_id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      const e = error as Error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
+
+  // Shop owner explicitly requests a driver for an order.
+  async requestDriverForShop(req:Request, res:Response) {
+    try {
+      const result = await ChiefProfileServices.requestDriverForShop(req.params.id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      const e = error as Error;
+      res.status(400).json({ status: "error", message: e.message });
+    }
+  }
+
   async deliverOrderDriver(req:Request, res:Response) {
     try {
       const result = await ChiefProfileServices.deliverOrderDriver(req.params.id);

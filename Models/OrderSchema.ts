@@ -103,6 +103,9 @@ const OrderSchema = new mongoose.Schema({
   // True once the ordered items' stock has been deducted from the shop's
   // inventory. Guards against double-deduction across retries/duplicate calls.
   stock_deducted: { type: Boolean, default: false },
+  // True once the shop owner explicitly requests a driver for this order.
+  // Surfaces the order as "seeking a driver" so drivers can bid on it.
+  driver_requested: { type: Boolean, default: false },
 }, { timestamps: true });
 
 export default mongoose.model("Order", OrderSchema);
