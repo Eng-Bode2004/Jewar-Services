@@ -173,6 +173,34 @@ class DriverProfileService {
          }
     }
 
+    async rejectSteps(profileId, steps, reason) {
+        try {
+            const validSteps = ["Documents_Status", "Vehicle_Status", "Background_Check_Status"];
+            if (!Array.isArray(steps) || steps.length === 0) {
+                throw new Error("steps array is required");
+            }
+            const invalid = steps.filter((s) => !validSteps.includes(s));
+            if (invalid.length > 0) {
+                throw new Error(`Invalid steps: ${invalid.join(", ")}`);
+            }
+            const update = {
+                Verification_Status: "rejected",
+                Is_Verified: false,
+            };
+            steps.forEach((s) => { update[s] = "rejected"; });
+            if (reason) update.Rejection_Reason = reason;
+            const updated = await DriverProfileModel.findByIdAndUpdate(
+                profileId,
+                update,
+                { new: true }
+            );
+            if (!updated) throw new Error("Profile not found");
+            return { status: "success", profile: updated };
+        } catch (error) {
+            throw new Error(error.message || "Failed to reject steps");
+        }
+    }
+
     async uploadDocument(profileId, docType, fileUrl) {
         try {
             const update = {};

@@ -14,6 +14,7 @@ router.delete("/:id", DriverProfileController.deleteProfile);
 
 router.patch("/:id/verify", DriverProfileController.verifyProfile);
 router.patch("/:id/verify-step", DriverProfileController.updateVerificationStep);
+router.patch("/:id/reject-steps", DriverProfileController.rejectSteps);
 router.get("/:id/verification-steps", DriverProfileController.getVerificationSteps);
 
 router.patch("/:id/documents", DriverProfileController.uploadDocument);

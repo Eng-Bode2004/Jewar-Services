@@ -85,6 +85,16 @@ class DriverProfileController {
          }
     }
 
+    async rejectSteps(req: any, res: any) {
+        try {
+            const { steps, reason } = req.body;
+            const result = await DriverProfileService.rejectSteps(req.params.id, steps, reason);
+            res.status(200).json(result);
+        } catch (error: any) {
+            res.status(400).json({ status: "error", message: error.message });
+        }
+    }
+
     async uploadDocument(req: any, res: any) {
         try {
             const { docType, fileUrl } = req.body;
