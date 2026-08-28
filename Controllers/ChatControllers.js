@@ -22,8 +22,8 @@ class ChatControllers {
 
   async sendMessage(req, res) {
     try {
-      const { sender_id, sender_role, text } = req.body;
-      const result = await ChatServices.sendMessage(req.params.orderId, sender_id, sender_role, text);
+      const { sender_id, sender_role, text, to_id } = req.body;
+      const result = await ChatServices.sendMessage(req.params.orderId, sender_id, sender_role, text, to_id);
       res.status(200).json(result);
     } catch (error) {
       res.status(400).json({ status: "error", message: error.message || "Failed" });
@@ -32,8 +32,10 @@ class ChatControllers {
 
   async getMessages(req, res) {
     try {
-      const { before, limit } = req.query;
-      const result = await ChatServices.getMessages(req.params.orderId, before, limit ? Number(limit) : 50);
+      const { me, other, before, limit } = req.query;
+      const result = await ChatServices.getMessages(
+        req.params.orderId, me, other, before, limit ? Number(limit) : 50
+      );
       res.status(200).json(result);
     } catch (error) {
       res.status(400).json({ status: "error", message: error.message || "Failed" });

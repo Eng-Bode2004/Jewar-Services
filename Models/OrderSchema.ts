@@ -72,6 +72,20 @@ const OrderSchema = new mongoose.Schema({
     country: String,
     label: String,
   },
+  // Shop-owner decline → refund flow.
+  // - status "shop_initiated": the shop declined and uploaded a receipt proving
+  //   they returned the money; awaiting the customer's confirmation.
+  // - status "customer_confirmed": the customer confirmed receiving the refund;
+  //   at this point the order is marked cancelled and removed from all sides.
+  refund_status: {
+    type: String,
+    enum: ["none", "shop_initiated", "customer_confirmed"],
+    default: "none",
+  },
+  refund_receipt: { type: String },
+  refund_amount: { type: Number },
+  refund_note: { type: String },
+  refunded_at: { type: Date },
   rejection_reason: { type: String },
   rating: { type: Number, min: 1, max: 5 },
   driver_rating: { type: Number, min: 1, max: 5 },

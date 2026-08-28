@@ -423,6 +423,38 @@ class ChiefProfileController {
     }
   }
 
+  // Shop owner declines an order and uploads a refund receipt for the money
+  // returned to the customer. Order stays in a "refund pending" state.
+  async declineOrderWithRefund(req:Request, res:Response) {
+    try {
+      const { chef_id, refund_receipt, refund_amount, refund_note } = req.body;
+      const result = await ChiefProfileServices.declineOrderWithRefund(
+        req.params.id, chef_id, { refundReceipt: refund_receipt, refundAmount: refund_amount, refundNote: refund_note }
+      );
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  // Customer confirms they received the refund from the shop. Order is marked
+  // cancelled and removed from the customer and driver sides.
+  async confirmCustomerRefund(req:Request, res:Response) {
+    try {
+      const { customer_id } = req.body;
+      const result = await ChiefProfileServices.confirmCustomerRefund(req.params.id, customer_id);
+      res.status(200).json(result);
+    } catch (error:unknown) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
   async settleChefEarnings(req:Request, res:Response) {
     try {
       const result = await ChiefProfileServices.settleChefEarnings(req.params.id);

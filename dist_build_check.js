@@ -83792,6 +83792,7 @@ var init_ChatSchema = __esm(() => {
   MessageSchema = new import_mongoose6.default.Schema({
     sender_id: { type: String, required: true },
     sender_role: { type: String, enum: ["customer", "driver", "chef"], required: true },
+    to_id: { type: String, index: true },
     text: { type: String, required: true },
     created_at: { type: Date, default: Date.now }
   }, { _id: false });
@@ -83875,12 +83876,12 @@ var require_ChatServices = __commonJS((exports, module) => {
         throw new Error(error.message || "Failed to get chat");
       }
     }
-    async sendMessage(orderId, senderId, senderRole, text) {
+    async sendMessage(orderId, senderId, senderRole, text, toId) {
       try {
         const chat = await Chat.findOne({ order_id: orderId });
         if (!chat)
           throw new Error("Chat not found for this order");
-        const msg = { sender_id: senderId, sender_role: senderRole, text };
+        const msg = { sender_id: senderId, sender_role: senderRole, to_id: toId || null, text };
         chat.messages.push(msg);
         await chat.save();
         const saved = chat.messages[chat.messages.length - 1];
@@ -83889,12 +83890,12 @@ var require_ChatServices = __commonJS((exports, module) => {
         throw new Error(error.message || "Failed to send message");
       }
     }
-    async getMessages(orderId, before, limit = 50) {
+    async getMessages(orderId, me, other, before, limit = 50) {
       try {
         const chat = await Chat.findOne({ order_id: orderId });
         if (!chat)
           return { status: "success", messages: [] };
-        let msgs = chat.messages;
+        let msgs = (chat.messages || []).filter((m) => m && m.to_id && (m.sender_id === me && m.to_id === other || m.sender_id === other && m.to_id === me));
         if (before) {
           const idx = msgs.findIndex((m) => m._id.toString() === before);
           if (idx > 0)
@@ -83908,7 +83909,10 @@ var require_ChatServices = __commonJS((exports, module) => {
     }
     async getChatsByUser(userId) {
       try {
-        const chats = await Chat.find({ "participants.id": userId }).sort({ updatedAt: -1 });
+        const chats = await Chat.find({ "participants.id": userId }).sort({ updatedAt: -1 }).lean();
+        for (const chat of chats) {
+          chat.messages = (chat.messages || []).filter((m) => m && (m.sender_id === userId || m.to_id === userId));
+        }
         return { status: "success", chats };
       } catch (error) {
         throw new Error(error.message || "Failed to get chats for user");
@@ -83942,8 +83946,8 @@ var require_ChatControllers = __commonJS((exports, module) => {
     }
     async sendMessage(req, res) {
       try {
-        const { sender_id, sender_role, text } = req.body;
-        const result = await ChatServices.sendMessage(req.params.orderId, sender_id, sender_role, text);
+        const { sender_id, sender_role, text, to_id } = req.body;
+        const result = await ChatServices.sendMessage(req.params.orderId, sender_id, sender_role, text, to_id);
         res.status(200).json(result);
       } catch (error) {
         res.status(400).json({ status: "error", message: error.message || "Failed" });
@@ -83951,8 +83955,8 @@ var require_ChatControllers = __commonJS((exports, module) => {
     }
     async getMessages(req, res) {
       try {
-        const { before, limit } = req.query;
-        const result = await ChatServices.getMessages(req.params.orderId, before, limit ? Number(limit) : 50);
+        const { me, other, before, limit } = req.query;
+        const result = await ChatServices.getMessages(req.params.orderId, me, other, before, limit ? Number(limit) : 50);
         res.status(200).json(result);
       } catch (error) {
         res.status(400).json({ status: "error", message: error.message || "Failed" });
@@ -84164,6 +84168,15 @@ var OrderSchema = new import_mongoose3.default.Schema({
     country: String,
     label: String
   },
+  refund_status: {
+    type: String,
+    enum: ["none", "shop_initiated", "customer_confirmed"],
+    default: "none"
+  },
+  refund_receipt: { type: String },
+  refund_amount: { type: Number },
+  refund_note: { type: String },
+  refunded_at: { type: Date },
   rejection_reason: { type: String },
   rating: { type: Number, min: 1, max: 5 },
   driver_rating: { type: Number, min: 1, max: 5 },
@@ -84883,6 +84896,52 @@ class ChiefProfileService {
       throw new Error(error.message || "Failed to update order status");
     }
   }
+  async declineOrderWithRefund(orderId, chefId, { refundReceipt, refundAmount, refundNote }) {
+    try {
+      if (!chefId)
+        throw new Error("Missing shop id");
+      const order = await OrderSchema_default.findOne({ _id: orderId, chef_id: chefId });
+      if (!order)
+        throw new Error("Order not found for this shop");
+      if (!refundReceipt || !refundReceipt.toString().trim()) {
+        throw new Error("A refund receipt is required before declining");
+      }
+      const amount = Number(refundAmount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("A refund amount is required");
+      }
+      const update = {
+        refund_status: "shop_initiated",
+        refund_receipt: refundReceipt,
+        refund_amount: amount,
+        ...refundNote ? { refund_note: refundNote } : {}
+      };
+      const updated = await OrderSchema_default.findByIdAndUpdate(orderId, update, { new: true });
+      return { status: "success", order: updated };
+    } catch (error) {
+      throw new Error(error.message || "Failed to decline order with refund");
+    }
+  }
+  async confirmCustomerRefund(orderId, customerId) {
+    try {
+      if (!customerId)
+        throw new Error("Missing customer id");
+      const order = await OrderSchema_default.findOne({ _id: orderId, customer_id: customerId });
+      if (!order)
+        throw new Error("Order not found for this customer");
+      if (order.refund_status !== "shop_initiated") {
+        throw new Error("No pending refund to confirm");
+      }
+      const updated = await OrderSchema_default.findByIdAndUpdate(orderId, {
+        refund_status: "customer_confirmed",
+        refunded_at: new Date,
+        order_status: "cancelled"
+      }, { new: true });
+      return { status: "success", order: updated };
+    } catch (error) {
+      throw new Error(error.message || "Failed to confirm refund");
+    }
+  }
   async settleChefEarnings(chefId) {
     try {
       const chef = await ShopOwnerProfileSchema_default.findById(chefId);
@@ -85016,6 +85075,7 @@ class ChiefProfileService {
       }
       const baseQuery = {
         order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
+        refund_status: { $ne: "shop_initiated" },
         $or: [
           { driver_id: { $exists: false } },
           { driver_id: null },
@@ -85114,6 +85174,7 @@ class ChiefProfileService {
       const order = await OrderSchema_default.findOneAndUpdate({
         _id: orderId,
         order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
+        refund_status: { $ne: "shop_initiated" },
         $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }]
       }, { driver_id: driverId, order_status: "accepted", delivery_step: "accepted" }, { new: true });
       if (!order)
@@ -85845,6 +85906,30 @@ class ChiefProfileController {
       });
     }
   }
+  async declineOrderWithRefund(req, res) {
+    try {
+      const { chef_id, refund_receipt, refund_amount, refund_note } = req.body;
+      const result = await ChiefProfileServices_default.declineOrderWithRefund(req.params.id, chef_id, { refundReceipt: refund_receipt, refundAmount: refund_amount, refundNote: refund_note });
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+  async confirmCustomerRefund(req, res) {
+    try {
+      const { customer_id } = req.body;
+      const result = await ChiefProfileServices_default.confirmCustomerRefund(req.params.id, customer_id);
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
   async settleChefEarnings(req, res) {
     try {
       const result = await ChiefProfileServices_default.settleChefEarnings(req.params.id);
@@ -86119,6 +86204,8 @@ router.patch("/order/:id/shop-payment-verify", ChiefProfileControllers_default.s
 router.patch("/order/:id/accept", ChiefProfileControllers_default.acceptOrder);
 router.patch("/order/:id/status", ChiefProfileControllers_default.updateOrderStatus);
 router.patch("/order/:id/delivery-step", ChiefProfileControllers_default.updateDeliveryStep);
+router.patch("/order/:id/decline-refund", ChiefProfileControllers_default.declineOrderWithRefund);
+router.patch("/order/:id/confirm-refund", ChiefProfileControllers_default.confirmCustomerRefund);
 router.get("/order/chef/:chefId/earnings", ChiefProfileControllers_default.getChefEarnings);
 router.get("/admin/pending-payments", ChiefProfileControllers_default.getPendingPayments);
 router.patch("/admin/settle-earnings/chef/:id", ChiefProfileControllers_default.settleChefEarnings);

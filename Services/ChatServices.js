@@ -39,12 +39,12 @@ class ChatServices {
     }
   }
 
-  async sendMessage(orderId, senderId, senderRole, text) {
+  async sendMessage(orderId, senderId, senderRole, text, toId) {
     try {
       const chat = await Chat.findOne({ order_id: orderId });
       if (!chat) throw new Error("Chat not found for this order");
 
-      const msg = { sender_id: senderId, sender_role: senderRole, text };
+      const msg = { sender_id: senderId, sender_role: senderRole, to_id: toId || null, text };
       chat.messages.push(msg);
       await chat.save();
 
@@ -55,12 +55,22 @@ class ChatServices {
     }
   }
 
-  async getMessages(orderId, before, limit = 50) {
+  // Returns only the messages that belong to the conversation between [me] and
+  // [other] (the two ids participating in this chat screen). Every message is
+  // stored with a `to_id` recipient, so the shared per-order chat never leaks
+  // one role's private conversation to another role.
+  async getMessages(orderId, me, other, before, limit = 50) {
     try {
       const chat = await Chat.findOne({ order_id: orderId });
       if (!chat) return { status: "success", messages: [] };
 
-      let msgs = chat.messages;
+      let msgs = (chat.messages || []).filter(
+        (m) =>
+          m &&
+          m.to_id &&
+          ((m.sender_id === me && m.to_id === other) ||
+            (m.sender_id === other && m.to_id === me))
+      );
       if (before) {
         const idx = msgs.findIndex((m) => m._id.toString() === before);
         if (idx > 0) msgs = msgs.slice(0, idx);
@@ -75,9 +85,18 @@ class ChatServices {
 
   // List every chat the given user is a participant in, newest first. Used by
   // the clients to poll for new inbound chat messages to show as in-app popups.
+  // Messages are filtered to those involving this user only (sent by them or
+  // addressed to them), so no other role's private conversation ever appears.
   async getChatsByUser(userId) {
     try {
-      const chats = await Chat.find({ "participants.id": userId }).sort({ updatedAt: -1 });
+      const chats = await Chat.find({ "participants.id": userId })
+        .sort({ updatedAt: -1 })
+        .lean();
+      for (const chat of chats) {
+        chat.messages = (chat.messages || []).filter(
+          (m) => m && (m.sender_id === userId || m.to_id === userId)
+        );
+      }
       return { status: "success", chats };
     } catch (error) {
       throw new Error(error.message || "Failed to get chats for user");

@@ -820,6 +820,61 @@ class ChiefProfileService {
     }
   }
 
+  // Shop owner declines an order: they must upload a receipt proving they sent
+  // the money back to the customer. The order is NOT cancelled yet — it enters a
+  // "refund pending" state that stays visible to the customer (and is hidden from
+  // the driver pool) until the customer confirms they received the refund.
+  async declineOrderWithRefund(orderId, chefId, { refundReceipt, refundAmount, refundNote }) {
+    try {
+      if (!chefId) throw new Error("Missing shop id");
+      const order = await OrderSchema.findOne({ _id: orderId, chef_id: chefId });
+      if (!order) throw new Error("Order not found for this shop");
+      if (!refundReceipt || !refundReceipt.toString().trim()) {
+        throw new Error("A refund receipt is required before declining");
+      }
+      const amount = Number(refundAmount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("A refund amount is required");
+      }
+      const update = {
+        refund_status: "shop_initiated",
+        refund_receipt: refundReceipt,
+        refund_amount: amount,
+        ...(refundNote ? { refund_note: refundNote } : {}),
+      };
+      const updated = await OrderSchema.findByIdAndUpdate(orderId, update, { new: true });
+      return { status: "success", order: updated };
+    } catch (error) {
+      throw new Error(error.message || "Failed to decline order with refund");
+    }
+  }
+
+  // Customer confirms they received the refund sent back by the shop. Only the
+  // customer who owns the order may confirm, and only once the shop has initiated
+  // the refund. On confirmation the order is marked cancelled and refunded.
+  async confirmCustomerRefund(orderId, customerId) {
+    try {
+      if (!customerId) throw new Error("Missing customer id");
+      const order = await OrderSchema.findOne({ _id: orderId, customer_id: customerId });
+      if (!order) throw new Error("Order not found for this customer");
+      if (order.refund_status !== "shop_initiated") {
+        throw new Error("No pending refund to confirm");
+      }
+      const updated = await OrderSchema.findByIdAndUpdate(
+        orderId,
+        {
+          refund_status: "customer_confirmed",
+          refunded_at: new Date(),
+          order_status: "cancelled",
+        },
+        { new: true }
+      );
+      return { status: "success", order: updated };
+    } catch (error) {
+      throw new Error(error.message || "Failed to confirm refund");
+    }
+  }
+
   async settleChefEarnings(chefId) {
     try {
       const chef = await ShopOwnerProfileSchema.findById(chefId);
@@ -981,6 +1036,8 @@ class ChiefProfileService {
       // delivery / completed / cancelled, are excluded.
       const baseQuery = {
         order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
+        // Hide orders the shop declined and is refunding (awaiting customer confirmation).
+        refund_status: { $ne: "shop_initiated" },
         $or: [
           { driver_id: { $exists: false } },
           { driver_id: null },
@@ -1092,6 +1149,7 @@ class ChiefProfileService {
         {
           _id: orderId,
           order_status: { $nin: ["cancelled", "completed", "out_for_delivery", "delivered"] },
+          refund_status: { $ne: "shop_initiated" },
           $or: [{ driver_id: { $exists: false } }, { driver_id: null }, { driver_id: "" }],
         },
         { driver_id: driverId, order_status: "accepted", delivery_step: "accepted" },

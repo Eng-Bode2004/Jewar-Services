@@ -110,6 +110,14 @@ router.patch("/order/:id/status", ShopOwnerProfileControllers.updateOrderStatus)
 // Driver: update delivery step (accepted / picked_up / in_transit / delivered)
 router.patch("/order/:id/delivery-step", ShopOwnerProfileControllers.updateDeliveryStep);
 
+// Shop owner: decline an order + upload a refund receipt for the money returned
+// to the customer (order moves into a "refund pending" state).
+router.patch("/order/:id/decline-refund", ShopOwnerProfileControllers.declineOrderWithRefund);
+
+// Customer: confirm they received the refund back from the shop. The order is
+// then cancelled and removed from the customer and driver sides.
+router.patch("/order/:id/confirm-refund", ShopOwnerProfileControllers.confirmCustomerRefund);
+
 // Chef: get earnings summary (completed orders, 10% fee)
 router.get("/order/chef/:chefId/earnings", ShopOwnerProfileControllers.getChefEarnings);
 
