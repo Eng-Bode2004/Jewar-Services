@@ -37,6 +37,7 @@ const OrderSchema = new mongoose.Schema({
   custom_request: { type: String },
   budget: { type: Number },
   is_custom: { type: Boolean, default: false },
+  is_direct_delivery: { type: Boolean, default: false },
   driver_requested: { type: Boolean, default: false },
   payment_method: { type: String },
   payment_image: { type: String },
