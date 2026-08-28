@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const OrderItemSchema = new mongoose.Schema({
-  dish_id: { type: String, required: true },
+  dish_id: { type: String },
   name: { type: String, required: true },
   price: { type: Number, required: true },
   qty: { type: Number, required: true, min: 1 },
@@ -32,8 +32,12 @@ const OrderSchema = new mongoose.Schema({
       { timestamps: false }
     ),
   ],
-  items: { type: [OrderItemSchema], required: true },
-  total: { type: Number, required: true },
+  items: { type: [OrderItemSchema], default: [] },
+  total: { type: Number, default: 0 },
+  custom_request: { type: String },
+  budget: { type: Number },
+  is_custom: { type: Boolean, default: false },
+  driver_requested: { type: Boolean, default: false },
   payment_method: { type: String },
   payment_image: { type: String },
   transaction_status: {
@@ -94,7 +98,7 @@ const OrderSchema = new mongoose.Schema({
   item_ratings: [
     new mongoose.Schema(
       {
-        dish_id: { type: String, required: true },
+        dish_id: { type: String },
         rating: { type: Number, min: 1, max: 5, required: true },
       },
       { _id: false }
