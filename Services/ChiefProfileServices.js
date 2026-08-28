@@ -238,15 +238,14 @@ async function deductOrderStock(order) {
                 [
                     {
                         $set: {
-                            stock_quantity: { $max: [0, { $subtract: ["$stock_quantity", qty] }] },
+                            stock_quantity: { $max: [0, { $subtract: [{ $ifNull: ["$stock_quantity", 0] }, qty] }] },
                             available: {
                                 $cond: [
-                                    { $gt: [{ $subtract: ["$stock_quantity", qty] }, 0] },
-                                    "$available",
-                                    false,
-                                ],
+                                    { $gt: [{ $subtract: [{ $ifNull: ["$stock_quantity", 0] }, qty] }, 0] },
+                                    { $ifNull: ["$available", true] },
+                                    false
+                                ]
                             },
-                        },
                     },
                 ]
             );
