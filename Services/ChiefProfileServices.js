@@ -856,20 +856,47 @@ class ChiefProfileService {
       await assertShopOpen(data.chef_id);
 
       // Reject if an ordered item is unavailable or its stock is exhausted.
-      if (Array.isArray(data.items) && data.items.length && mongoose.connection.db) {
+      // Also backfill each item's display name/price from the dish catalog so a
+      // malformed/older client payload can't fail the whole order's validation
+      // (e.g. `items.0.name: path "name" is required` when name is empty/missing).
+      if (!Array.isArray(data.items)) {
+        data.items = [];
+      }
+      if (data.items.length && mongoose.connection.db) {
         const db = mongoose.connection.db;
         for (const item of data.items) {
           const dishId = item.dish_id;
           if (!dishId) continue;
           let dish = null;
           try {
-            dish = await db.collection("dishes").findOne({ _id: mongoose.Types.ObjectId.isValid(dishId) ? new mongoose.Types.ObjectId(dishId) : dishId }, { projection: { available: 1, stock_quantity: 1, stock_type: 1 } });
+            dish = await db.collection("dishes").findOne({ _id: mongoose.Types.ObjectId.isValid(dishId) ? new mongoose.Types.ObjectId(dishId) : dishId }, { projection: { available: 1, stock_quantity: 1, stock_type: 1, name: 1, english_name: 1, price: 1 } });
           } catch (_) {}
           if (dish && dish.available === false) {
             throw new Error("One of the items you selected is sold out");
           }
+          if (dish) {
+            const dishName = dish.english_name || dish.name;
+            if (!String(item.name ?? "").trim() && dishName) {
+              item.name = dishName;
+            }
+            if (item.price === undefined || item.price === null || Number.isNaN(Number(item.price))) {
+              const p = Number(dish.price);
+              item.price = Number.isFinite(p) ? p : 0;
+            }
+          }
         }
       }
+      // Last-resort defaults so the required name/price/qty never fail validation.
+      data.items = data.items.map((item) => {
+        const qty = Number(item.qty);
+        const price = Number(item.price);
+        return {
+          ...item,
+          name: String(item.name ?? "").trim() || "Item",
+          price: Number.isFinite(price) ? price : 0,
+          qty: Number.isFinite(qty) && qty >= 1 ? qty : 1,
+        };
+      });
 
       const order = await OrderSchema.create(data);
       // Seed the order's chat so the customer and shop are participants from the
