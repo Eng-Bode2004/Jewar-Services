@@ -247,6 +247,7 @@ async function deductOrderStock(order) {
                                 ]
                             },
                     },
+                    },
                 ]
             );
             if (res.modifiedCount || res.matchedCount) {
