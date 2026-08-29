@@ -1528,6 +1528,13 @@ class ChiefProfileService {
       // One single-document update, so concurrent drivers proposing at the same
       // time can't overwrite each other's offers (a read-modify-write + save()
       // would lose updates). Dedupes the bidding driver's own prior proposal.
+      //
+      // IMPORTANT: this uses a raw aggregation pipeline (updatePipeline: true),
+      // so Mongoose does NOT auto-generate subdocument _ids. We must create the
+      // offer's _id ourselves, otherwise order.delivery_offers.find(offerId) /
+      // .id(offerId) can never locate the offer → "Offer not found" when the
+      // customer or shop tries to respond to it.
+      const newOfferId = new mongoose.Types.ObjectId();
       const closed = ["out_for_delivery", "delivered", "completed", "cancelled"];
       const res = await OrderSchema.updateOne(
         {
@@ -1554,6 +1561,7 @@ class ChiefProfileService {
                   },
                   [
                     {
+                      _id: newOfferId,
                       driver_id: String(driverId),
                       driver_name: driverName || "Driver",
                       amount: price,
